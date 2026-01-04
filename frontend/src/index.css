@@ -1,0 +1,632 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* ============================================
+   GLOBAL STYLES & DARK MODE FOUNDATION
+   ============================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: #000000;
+  color: #FFFFFF;
+  line-height: 1.5;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ============================================
+   TYPOGRAPHY HIERARCHY
+   ============================================ */
+
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #FFFFFF;
+  margin: 0;
+}
+
+h1 { font-size: 3.75rem; }  /* 60px */
+h2 { font-size: 3rem; }     /* 48px */
+h3 { font-size: 2.25rem; }  /* 36px */
+h4 { font-size: 1.875rem; } /* 30px */
+h5 { font-size: 1.5rem; }   /* 24px */
+h6 { font-size: 1.25rem; }  /* 20px */
+
+p {
+  margin: 0;
+  color: #EBEBEB;
+  line-height: 1.6;
+}
+
+a {
+  color: #FFFFFF;
+  text-decoration: none;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+a:hover {
+  color: #D4D4D4;
+  transform: translateX(2px);
+}
+
+/* Label styles */
+label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #EBEBEB;
+  letter-spacing: 0.01em;
+  transition: color 0.2s ease;
+}
+
+label:hover {
+  color: #FFFFFF;
+}
+
+/* Small text / captions */
+small {
+  font-size: 0.75rem;
+  color: #B3B3B3;
+  line-height: 1.4;
+}
+
+/* ============================================
+   SPACING & RHYTHM UTILITIES
+   ============================================ */
+
+.spacing-section {
+  padding-top: 6rem;
+  padding-bottom: 6rem;
+}
+
+.spacing-container {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .spacing-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .spacing-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* ============================================
+   BACKGROUND LAYERS & SURFACES
+   ============================================ */
+
+/* Primary background - Pure black */
+.bg-layer-primary {
+  background-color: #000000;
+}
+
+/* Secondary background - Soft black for elevated surfaces */
+.bg-layer-secondary {
+  background-color: #0A0A0A;
+}
+
+/* Tertiary background - Charcoal for cards */
+.bg-layer-tertiary {
+  background-color: #111111;
+}
+
+/* Elevated panels */
+.bg-layer-elevated {
+  background-color: #1A1A1A;
+}
+
+/* ============================================
+   BORDER STYLES - THIN, SUBTLE, ELEGANT
+   ============================================ */
+
+/* Subtle border - barely visible */
+.border-thin-subtle {
+  border: 1px solid #1A1A1A;
+}
+
+/* Default border */
+.border-thin-default {
+  border: 1px solid #262626;
+}
+
+/* Medium border */
+.border-thin-medium {
+  border: 1px solid #404040;
+}
+
+/* Strong border for emphasis */
+.border-thin-strong {
+  border: 1px solid #525252;
+}
+
+/* Elegant top border accent */
+.border-accent-top {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.border-accent-bottom {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================
+   GLASSMORPHISM - REFINED OVERLAYS
+   ============================================ */
+
+/* AI-Native Glassmorphism */
+.glassmorphism {
+  background: rgba(10, 10, 10, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glassmorphism-light {
+  background: rgba(26, 26, 26, 0.7);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+/* Strong glass for prominent elements */
+.glassmorphism-strong {
+  background: rgba(17, 17, 17, 0.8);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ============================================
+   INPUT & FORM ELEMENTS - DARK MODE OPTIMIZED
+   ============================================ */
+
+input, textarea, select {
+  background-color: #111111;
+  border: 1px solid #262626;
+  color: #FFFFFF;
+  padding: 0.625rem 0.875rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #404040;
+  background-color: #1A1A1A;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.05), 0 0 0 3px rgba(255, 255, 255, 0.03);
+}
+
+input::placeholder, textarea::placeholder {
+  color: #737373;
+}
+
+input:disabled, textarea:disabled, select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: #0A0A0A;
+}
+
+/* ============================================
+   CARD COMPONENTS - CONSISTENT STYLING
+   ============================================ */
+
+.card-base {
+  background: #111111;
+  border: 1px solid #262626;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-elevated {
+  background: #1A1A1A;
+  border: 1px solid #404040;
+  box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
+}
+
+.card-hover:hover {
+  transform: translateY(-4px) scale(1.01);
+  border-color: #525252;
+  box-shadow: 0 12px 40px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* ============================================
+   MINIMAL GRADIENT BORDERS
+   ============================================ */
+
+/* Minimal Gradient Borders - Grayscale Focus */
+.gradient-border {
+  background: linear-gradient(135deg, #404040, #8C8C8C, #D9D9D9);
+  border-radius: 16px;
+  padding: 1px;
+}
+
+.gradient-border-inner {
+  background: rgba(10, 10, 10, 0.95);
+  border-radius: 15px;
+  height: 100%;
+  width: 100%;
+}
+
+/* Futuristic Accent Borders */
+.ai-border {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+}
+
+.ai-border::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.05));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+}
+
+/* Floating Animations - Minimal & Smooth */
+.animate-float {
+  animation: float 8s ease-in-out infinite;
+}
+
+.animate-float-delayed {
+  animation: float 8s ease-in-out infinite;
+  animation-delay: -3s;
+}
+
+.animate-float-delayed-2 {
+  animation: float 8s ease-in-out infinite;
+  animation-delay: -6s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  33% {
+    transform: translateY(-25px) translateX(15px);
+  }
+  66% {
+    transform: translateY(15px) translateX(-10px);
+  }
+}
+
+/* AI Glow Effects - Subtle Grayscale */
+.glow-effect {
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.1), 0 0 60px rgba(255, 255, 255, 0.05);
+}
+
+.glow-effect-strong {
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.15), 0 0 80px rgba(255, 255, 255, 0.08);
+}
+
+/* Minimal Text Effects */
+.neon-text {
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.text-shimmer {
+  background: linear-gradient(90deg, #666666, #FFFFFF, #666666);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+/* ============================================
+   SCROLLBAR - MINIMAL DARK DESIGN
+   ============================================ */
+
+/* Futuristic Scrollbar - Minimal */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 10, 10, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) rgba(10, 10, 10, 0.5);
+}
+
+/* AI Scan Effect */
+.scan-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: scan 3s ease-in-out infinite;
+}
+
+/* ============================================
+   UTILITY CLASSES - TEXT & LAYOUT
+   ============================================ */
+
+/* Text utilities */
+.text-heading {
+  color: #FFFFFF;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text-body {
+  color: #E5E5E5;
+  line-height: 1.6;
+}
+
+.text-caption {
+  color: #A3A3A3;
+  font-size: 0.875rem;
+}
+
+.text-muted {
+  color: #737373;
+}
+
+/* Line clamping utilities */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  -webkit-box-orient: vertical;
+}
+
+.line-clamp-2 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.line-clamp-3 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+/* Grid Pattern Background - Futuristic */
+.grid-background {
+  background-image: 
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+}
+
+/* Dot pattern background */
+.dot-background {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* AI Card Hover Effect */
+.ai-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1);
+}
+
+/* Minimal Divider */
+.ai-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+/* Vertical divider */
+.ai-divider-vertical {
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+/* ============================================
+   FOCUS STATES & ACCESSIBILITY
+   ============================================ */
+
+/* Minimal focus states with smooth animation */
+*:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 3px;
+  border-radius: 0.25rem;
+  transition: outline 0.2s ease, outline-offset 0.2s ease;
+}
+
+button:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.45);
+  outline-offset: 3px;
+  transition: outline 0.2s ease, outline-offset 0.2s ease;
+}
+
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+}
+
+/* Selection styling */
+::selection {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+::-moz-selection {
+  background-color: rgba(255, 255, 255, 0.25);
+  color: #FFFFFF;
+}
+
+/* ============================================
+   ANIMATIONS & TRANSITIONS
+   ============================================ */
+
+/* Smooth entrance animation for elements */
+.animate-enter {
+  animation: enter 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Staggered animation delays */
+.animate-delay-100 {
+  animation-delay: 0.1s;
+}
+
+.animate-delay-200 {
+  animation-delay: 0.2s;
+}
+
+.animate-delay-300 {
+  animation-delay: 0.3s;
+}
+
+.animate-delay-400 {
+  animation-delay: 0.4s;
+}
+
+/* Hover lift effect */
+.hover-lift {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.08);
+}
+
+/* Hover glow effect */
+.hover-glow {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hover-glow:hover {
+  box-shadow: 0 0 25px rgba(255, 255, 255, 0.12);
+}
+
+/* Button press effect */
+.active-press:active {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* Smooth backdrop blur transition */
+.backdrop-transition {
+  transition: backdrop-filter 0.3s ease;
+}
+
+/* Pulse animation for attention */
+.pulse-subtle {
+  animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.85;
+  }
+}
+
+/* Fade in from bottom */
+.fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scale in animation */
+.scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
