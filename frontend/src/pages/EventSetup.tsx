@@ -88,7 +88,7 @@ const EventSetup: React.FC = () => {
         image: 'https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg'
       };
 
-      // Create event via API (saves to database and uploads map to Cloudinary)
+      // Create event via API (saves to database)
       const response = await createEvent(eventData);
       
       if (response.success) {
@@ -96,7 +96,7 @@ const EventSetup: React.FC = () => {
         addEvent({
           id: response.data._id,
           ...eventData,
-          mapFile: response.data.mapFile, // Use Cloudinary URL
+          mapFile: response.data.mapFile, // Map file URL
           registeredUsers: []
         });
         

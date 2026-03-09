@@ -1,6 +1,5 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma.js';
-import cloudinary from '../config/cloudinary.js';
 
 const eventInclude = {
   zones: true,
@@ -40,22 +39,10 @@ export const createEvent = async (req: Request, res: Response) => {
       image
     } = req.body;
 
-    // Upload map file to Cloudinary if provided
+    // Store map file base64 directly if provided
     let mapFileUrl = '';
     if (mapFileBase64) {
-      try {
-        const uploadResult = await cloudinary.uploader.upload(mapFileBase64, {
-          folder: 'event-maps',
-          resource_type: 'auto',
-        });
-        mapFileUrl = uploadResult.secure_url;
-      } catch (uploadError) {
-        console.error('Cloudinary upload error:', uploadError);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to upload map file to Cloudinary',
-        });
-      }
+      mapFileUrl = mapFileBase64;
     }
 
     // Create the event with nested relations
@@ -200,21 +187,9 @@ export const updateEvent = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { zones, cameras, dispatchUnits, mapFileBase64, ...updateData } = req.body;
 
-    // If there's a new map file, upload it to Cloudinary
+    // If there's a new map file, store it directly
     if (mapFileBase64) {
-      try {
-        const uploadResult = await cloudinary.uploader.upload(mapFileBase64, {
-          folder: 'event-maps',
-          resource_type: 'auto',
-        });
-        updateData.mapFile = uploadResult.secure_url;
-      } catch (uploadError) {
-        console.error('Cloudinary upload error:', uploadError);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to upload map file to Cloudinary',
-        });
-      }
+      updateData.mapFile = mapFileBase64;
     }
 
     if (updateData.crowdSize) updateData.crowdSize = Number(updateData.crowdSize);

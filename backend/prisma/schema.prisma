@@ -52,7 +52,7 @@ model Event {
   crowdSize       Int
   location        String
   description     String?
-  mapFile         String?  // Cloudinary URL
+  mapFile         String?  // Base64 encoded map image
   image           String?
   organizerId     String
   organizerEmail  String
