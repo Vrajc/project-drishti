@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import prisma from '../lib/prisma';
+import prisma from '../lib/prisma.js';
 
 // Validation helper functions
 const validateGmail = (email: string): boolean => {

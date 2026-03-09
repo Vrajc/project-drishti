@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma';
-import cloudinary from '../config/cloudinary';
+import prisma from '../lib/prisma.js';
+import cloudinary from '../config/cloudinary.js';
 
 const eventInclude = {
   zones: true,

@@ -5,8 +5,8 @@ import {
   updateIncidentStatus,
   getAllIncidents,
   deleteIncident,
-} from '../controllers/incident.controller';
-import { authenticate } from '../middleware/auth.middleware';
+} from '../controllers/incident.controller.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 

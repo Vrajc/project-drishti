@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../lib/prisma';
+import prisma from '../lib/prisma.js';
 import { IncidentType, IncidentStatus } from '@prisma/client';
 
 const typeMap: Record<string, IncidentType> = {

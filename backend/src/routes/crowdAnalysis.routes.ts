@@ -8,8 +8,8 @@ import {
   getEventZones,
   uploadVideo,
   generateMockData
-} from '../controllers/crowdAnalysis.controller';
-import { authenticate } from '../middleware/auth.middleware';
+} from '../controllers/crowdAnalysis.controller.js';
+import { authenticate } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 

@@ -1,12 +1,12 @@
 import { Request, Response } from 'express';
-import crowdAnalysisService from '../services/crowdAnalysis.service';
-import prisma from '../lib/prisma';
+import crowdAnalysisService from '../services/crowdAnalysis.service.js';
+import prisma from '../lib/prisma.js';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { generateMockCrowdData } from '../utils/mockCrowdData';
+import { generateMockCrowdData } from '../utils/mockCrowdData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

@@ -1,16 +1,16 @@
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { connectDatabase } from './config/database';
-import authRoutes from './routes/auth.routes';
-import eventRoutes from './routes/event.routes';
-import userRoutes from './routes/user.routes';
-import monitoringRoutes from './routes/monitoring.routes';
-import aiRoutes from './routes/ai.routes';
-import incidentRoutes from './routes/incident.routes';
-import crowdAnalysisRoutes from './routes/crowdAnalysis.routes';
-import { listModels } from './utils/openai.service';
-import { seedTestUser } from './utils/seedDatabase';
+import { connectDatabase } from './config/database.js';
+import authRoutes from './routes/auth.routes.js';
+import eventRoutes from './routes/event.routes.js';
+import userRoutes from './routes/user.routes.js';
+import monitoringRoutes from './routes/monitoring.routes.js';
+import aiRoutes from './routes/ai.routes.js';
+import incidentRoutes from './routes/incident.routes.js';
+import crowdAnalysisRoutes from './routes/crowdAnalysis.routes.js';
+import { listModels } from './utils/openai.service.js';
+import { seedTestUser } from './utils/seedDatabase.js';
 
 // Load environment variables
 dotenv.config();

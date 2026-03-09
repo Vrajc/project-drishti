@@ -7,7 +7,7 @@ import {
   generateSafetyReport,
   analyzeLiveMonitoring,
   ChatMessage
-} from '../utils/openai.service';
+} from '../utils/openai.service.js';
 
 /**
  * Handle AI chat interactions with live event context
