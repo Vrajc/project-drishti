@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import crowdAnalysisService from '../services/crowdAnalysis.service';
-import { Event } from '../models/event.model';
+import prisma from '../lib/prisma';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -64,7 +64,7 @@ export const processVideoFootage = async (req: Request, res: Response) => {
     }
 
     // Verify event exists
-    const event = await Event.findById(eventId);
+    const event = await prisma.event.findUnique({ where: { id: eventId } });
     if (!event) {
       // Clean up uploaded file
       fs.unlinkSync(req.file.path);
@@ -244,7 +244,10 @@ export const getEventZones = async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
 
-    const event = await Event.findById(eventId);
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: { zones: true },
+    });
     if (!event) {
       return res.status(404).json({
         success: false,
@@ -276,7 +279,10 @@ export const generateMockData = async (req: Request, res: Response) => {
   try {
     const { eventId } = req.params;
 
-    const event = await Event.findById(eventId);
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      include: { zones: true },
+    });
     if (!event) {
       return res.status(404).json({
         success: false,

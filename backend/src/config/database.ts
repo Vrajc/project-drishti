@@ -1,25 +1,22 @@
-import mongoose from 'mongoose';
+import prisma from '../lib/prisma';
 
 export const connectDatabase = async (): Promise<void> => {
   try {
-    const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/drishti-event-safety';
-    
-    await mongoose.connect(mongoURI);
-    
-    console.log('✅ MongoDB connected successfully');
-    console.log(`📦 Database: ${mongoose.connection.name}`);
+    await prisma.$connect();
+    console.log('✅ PostgreSQL connected successfully via Prisma');
   } catch (error) {
-    console.error('❌ MongoDB connection error:', error);
+    console.error('❌ PostgreSQL connection error:', error);
     throw error;
   }
 };
 
 export const disconnectDatabase = async (): Promise<void> => {
   try {
-    await mongoose.disconnect();
-    console.log('✅ MongoDB disconnected successfully');
+    await prisma.$disconnect();
+    console.log('✅ PostgreSQL disconnected successfully');
   } catch (error) {
-    console.error('❌ MongoDB disconnection error:', error);
+    console.error('❌ PostgreSQL disconnection error:', error);
     throw error;
   }
 };
+

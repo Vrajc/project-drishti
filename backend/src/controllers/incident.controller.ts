@@ -1,28 +1,52 @@
 import { Request, Response } from 'express';
-import Incident from '../models/incident.model';
+import prisma from '../lib/prisma';
+import { IncidentType, IncidentStatus } from '@prisma/client';
+
+const typeMap: Record<string, IncidentType> = {
+  medical: 'MEDICAL',
+  security: 'SECURITY',
+  lost_found: 'LOST_FOUND',
+  general: 'GENERAL',
+};
+
+const statusMap: Record<string, IncidentStatus> = {
+  open: 'OPEN',
+  investigating: 'INVESTIGATING',
+  resolved: 'RESOLVED',
+};
+
+// Format incident to match frontend expectations (lowercase enums, _id field)
+function formatIncident(inc: any) {
+  return {
+    ...inc,
+    _id: inc.id,
+    type: inc.type.toLowerCase(),
+    status: inc.status.toLowerCase(),
+  };
+}
 
 // Create a new incident
 export const createIncident = async (req: Request, res: Response) => {
   try {
     const { eventId, type, description, location, reporter, reporterEmail } = req.body;
 
-    const incident = new Incident({
-      eventId,
-      type,
-      description,
-      location,
-      reporter,
-      reporterEmail,
-      timestamp: new Date(),
-      status: 'open',
+    const incident = await prisma.incident.create({
+      data: {
+        eventId,
+        type: typeMap[type] || 'GENERAL',
+        description,
+        location,
+        reporter,
+        reporterEmail,
+        timestamp: new Date(),
+        status: 'OPEN',
+      },
     });
-
-    await incident.save();
 
     res.status(201).json({
       success: true,
       message: 'Incident reported successfully',
-      data: incident,
+      data: formatIncident(incident),
     });
   } catch (error: any) {
     console.error('Error creating incident:', error);
@@ -40,17 +64,19 @@ export const getIncidentsByEvent = async (req: Request, res: Response) => {
     const { eventId } = req.params;
     const { status } = req.query;
 
-    let query: any = { eventId };
-    
+    const where: any = { eventId };
     if (status) {
-      query.status = status;
+      where.status = statusMap[status as string] || status;
     }
 
-    const incidents = await Incident.find(query).sort({ timestamp: -1 });
+    const incidents = await prisma.incident.findMany({
+      where,
+      orderBy: { timestamp: 'desc' },
+    });
 
     res.status(200).json({
       success: true,
-      data: incidents,
+      data: incidents.map(formatIncident),
     });
   } catch (error: any) {
     console.error('Error fetching incidents:', error);
@@ -75,7 +101,7 @@ export const updateIncidentStatus = async (req: Request, res: Response) => {
       });
     }
 
-    const incident = await Incident.findById(id);
+    const incident = await prisma.incident.findUnique({ where: { id } });
 
     if (!incident) {
       return res.status(404).json({
@@ -84,23 +110,25 @@ export const updateIncidentStatus = async (req: Request, res: Response) => {
       });
     }
 
+    const updateData: any = { status: statusMap[status] };
+
     // Calculate response time if incident is being resolved
-    if (status === 'resolved' && incident.status !== 'resolved') {
+    if (status === 'resolved' && incident.status !== 'RESOLVED') {
       const resolvedAt = new Date();
-      const responseTime = Math.floor((resolvedAt.getTime() - incident.timestamp.getTime()) / 1000); // in seconds
-      incident.status = status;
-      incident.responseTime = responseTime;
-      incident.resolvedAt = resolvedAt;
-    } else {
-      incident.status = status;
+      const responseTime = Math.floor((resolvedAt.getTime() - incident.timestamp.getTime()) / 1000);
+      updateData.responseTime = responseTime;
+      updateData.resolvedAt = resolvedAt;
     }
 
-    await incident.save();
+    const updated = await prisma.incident.update({
+      where: { id },
+      data: updateData,
+    });
 
     res.status(200).json({
       success: true,
       message: 'Incident status updated',
-      data: incident,
+      data: formatIncident(updated),
     });
   } catch (error: any) {
     console.error('Error updating incident:', error);
@@ -115,11 +143,13 @@ export const updateIncidentStatus = async (req: Request, res: Response) => {
 // Get all incidents (admin only)
 export const getAllIncidents = async (req: Request, res: Response) => {
   try {
-    const incidents = await Incident.find().sort({ timestamp: -1 });
+    const incidents = await prisma.incident.findMany({
+      orderBy: { timestamp: 'desc' },
+    });
 
     res.status(200).json({
       success: true,
-      data: incidents,
+      data: incidents.map(formatIncident),
     });
   } catch (error: any) {
     console.error('Error fetching all incidents:', error);
@@ -136,14 +166,7 @@ export const deleteIncident = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    const incident = await Incident.findByIdAndDelete(id);
-
-    if (!incident) {
-      return res.status(404).json({
-        success: false,
-        message: 'Incident not found',
-      });
-    }
+    await prisma.incident.delete({ where: { id } });
 
     res.status(200).json({
       success: true,
@@ -151,6 +174,9 @@ export const deleteIncident = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error deleting incident:', error);
+    if (error.code === 'P2025') {
+      return res.status(404).json({ success: false, message: 'Incident not found' });
+    }
     res.status(500).json({
       success: false,
       message: 'Error deleting incident',

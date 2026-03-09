@@ -1,10 +1,10 @@
-import { CrowdDensity } from '../models/crowdDensity.model';
+import prisma from '../lib/prisma';
 
 /**
  * Generate mock crowd density data for testing
  */
 export async function generateMockCrowdData(eventId: string, zones: any[]) {
-  const records = [];
+  const records: any[] = [];
   const now = new Date();
   
   // Generate data for last 5 minutes (every 15 seconds)
@@ -33,18 +33,16 @@ export async function generateMockCrowdData(eventId: string, zones: any[]) {
         videoTimestamp,
         cameraId: 'camera-1',
         cameraName: 'Main Camera',
-        metadata: {
-          frameNumber: i * 450,
-          confidence: 0.85,
-          processingTime: 0
-        }
+        frameNumber: i * 450,
+        confidence: 0.85,
+        processingTime: 0,
       });
     }
   }
   
   // Save to database
-  await CrowdDensity.insertMany(records);
+  const result = await prisma.crowdDensity.createMany({ data: records });
   
-  console.log(`✅ Generated ${records.length} mock crowd density records`);
+  console.log(`✅ Generated ${result.count} mock crowd density records`);
   return records;
 }

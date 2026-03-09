@@ -4,8 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { CrowdDensity } from '../models/crowdDensity.model';
-import { Event } from '../models/event.model';
+import prisma from '../lib/prisma';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,37 +54,31 @@ export class CrowdAnalysisService {
     sampleInterval: number = 15
   ): Promise<CrowdDensityRecord[]> {
     try {
-      // Validate video file exists
       if (!fs.existsSync(videoPath)) {
         throw new Error(`Video file not found: ${videoPath}`);
       }
 
-      // Validate zones
       if (!zones || zones.length === 0) {
         throw new Error('At least one zone must be defined');
       }
 
-      // Write zones to temporary file to avoid command line escaping issues on Windows
       const tempZonesFile = path.join(__dirname, `zones-${Date.now()}.json`);
       fs.writeFileSync(tempZonesFile, JSON.stringify(zones));
 
       try {
-        // Execute Python script
         console.log(`Processing video for event ${eventId}...`);
         const command = `python "${this.pythonScript}" "${videoPath}" "${tempZonesFile}" "${eventId}" ${sampleInterval}`;
-        
+
         const { stdout, stderr } = await execAsync(command, {
-          maxBuffer: 10 * 1024 * 1024, // 10MB buffer
+          maxBuffer: 10 * 1024 * 1024,
         });
 
         if (stderr) {
           console.warn('Python script warnings:', stderr);
         }
 
-        // Parse results
         const results: CrowdDensityRecord[] = JSON.parse(stdout);
 
-        // Add camera info if provided
         if (cameraId && cameraName) {
           results.forEach(record => {
             record.cameraId = cameraId;
@@ -95,7 +88,6 @@ export class CrowdAnalysisService {
 
         return results;
       } finally {
-        // Clean up temporary file
         if (fs.existsSync(tempZonesFile)) {
           fs.unlinkSync(tempZonesFile);
         }
@@ -117,8 +109,10 @@ export class CrowdAnalysisService {
     sampleInterval: number = 15
   ): Promise<{ success: boolean; recordCount: number; message: string }> {
     try {
-      // Get event and zones
-      const event = await Event.findById(eventId);
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        include: { zones: true },
+      });
       if (!event) {
         throw new Error('Event not found');
       }
@@ -127,11 +121,8 @@ export class CrowdAnalysisService {
         throw new Error('Event has no zones defined');
       }
 
-      // Convert zones to required format
-      // Note: This assumes zones are stored with proper structure in event
-      // You may need to adjust based on actual event.zones structure
       const zones: Zone[] = event.zones.map((zone: any, index: number) => ({
-        id: zone.id || `zone-${index}`,
+        id: zone.zoneId || `zone-${index}`,
         name: zone.name || zone,
         coordinates: zone.coordinates || [
           { x: 0, y: 0 },
@@ -139,10 +130,9 @@ export class CrowdAnalysisService {
           { x: 100, y: 100 },
           { x: 0, y: 100 }
         ],
-        maxCapacity: zone.maxCapacity || 10  // Lower default for better visualization
+        maxCapacity: zone.maxCapacity || 10,
       }));
 
-      // Process video
       const records = await this.processVideo(
         videoPath,
         eventId,
@@ -152,20 +142,35 @@ export class CrowdAnalysisService {
         sampleInterval
       );
 
-      // Save to database
-      const savedRecords = await CrowdDensity.insertMany(records);
+      // Save to database using Prisma createMany
+      const result = await prisma.crowdDensity.createMany({
+        data: records.map(r => ({
+          eventId: r.eventId,
+          zoneId: r.zoneId,
+          zoneName: r.zoneName,
+          peopleCount: r.peopleCount,
+          densityPercentage: r.densityPercentage,
+          timestamp: new Date(r.timestamp),
+          videoTimestamp: r.videoTimestamp,
+          cameraId: r.cameraId,
+          cameraName: r.cameraName,
+          frameNumber: r.metadata?.frameNumber,
+          confidence: r.metadata?.confidence,
+          processingTime: r.metadata?.processingTime,
+        })),
+      });
 
       return {
         success: true,
-        recordCount: savedRecords.length,
-        message: `Successfully processed video and saved ${savedRecords.length} records`
+        recordCount: result.count,
+        message: `Successfully processed video and saved ${result.count} records`,
       };
     } catch (error: any) {
       console.error('Error in processAndSaveVideo:', error);
       return {
         success: false,
         recordCount: 0,
-        message: error.message
+        message: error.message,
       };
     }
   }
@@ -180,19 +185,22 @@ export class CrowdAnalysisService {
     endTime?: Date
   ) {
     try {
-      const query: any = { eventId };
+      const where: any = { eventId };
 
       if (zoneId) {
-        query.zoneId = zoneId;
+        where.zoneId = zoneId;
       }
 
       if (startTime || endTime) {
-        query.timestamp = {};
-        if (startTime) query.timestamp.$gte = startTime;
-        if (endTime) query.timestamp.$lte = endTime;
+        where.timestamp = {};
+        if (startTime) where.timestamp.gte = startTime;
+        if (endTime) where.timestamp.lte = endTime;
       }
 
-      const data = await CrowdDensity.find(query).sort({ timestamp: 1 });
+      const data = await prisma.crowdDensity.findMany({
+        where,
+        orderBy: { timestamp: 'asc' },
+      });
       return data;
     } catch (error: any) {
       console.error('Error fetching crowd density data:', error);
@@ -205,21 +213,24 @@ export class CrowdAnalysisService {
    */
   async getLatestDensityByZone(eventId: string) {
     try {
-      const data = await CrowdDensity.aggregate([
-        { $match: { eventId } },
-        { $sort: { timestamp: -1 } },
-        {
-          $group: {
-            _id: '$zoneId',
-            latestRecord: { $first: '$$ROOT' }
-          }
-        },
-        {
-          $replaceRoot: { newRoot: '$latestRecord' }
-        }
-      ]);
+      // Get distinct zone IDs for this event
+      const zones = await prisma.crowdDensity.findMany({
+        where: { eventId },
+        distinct: ['zoneId'],
+        select: { zoneId: true },
+      });
 
-      return data;
+      // Get the latest record for each zone
+      const latestRecords = await Promise.all(
+        zones.map(async ({ zoneId }) => {
+          return prisma.crowdDensity.findFirst({
+            where: { eventId, zoneId },
+            orderBy: { timestamp: 'desc' },
+          });
+        })
+      );
+
+      return latestRecords.filter(Boolean);
     } catch (error: any) {
       console.error('Error fetching latest density:', error);
       throw new Error(`Failed to fetch latest density: ${error.message}`);
@@ -236,32 +247,41 @@ export class CrowdAnalysisService {
     endTime?: Date
   ) {
     try {
-      const matchQuery: any = { eventId, zoneId };
+      const where: any = { eventId, zoneId };
 
       if (startTime || endTime) {
-        matchQuery.timestamp = {};
-        if (startTime) matchQuery.timestamp.$gte = startTime;
-        if (endTime) matchQuery.timestamp.$lte = endTime;
+        where.timestamp = {};
+        if (startTime) where.timestamp.gte = startTime;
+        if (endTime) where.timestamp.lte = endTime;
       }
 
-      const stats = await CrowdDensity.aggregate([
-        { $match: matchQuery },
-        {
-          $group: {
-            _id: '$zoneId',
-            zoneName: { $first: '$zoneName' },
-            avgPeopleCount: { $avg: '$peopleCount' },
-            maxPeopleCount: { $max: '$peopleCount' },
-            minPeopleCount: { $min: '$peopleCount' },
-            avgDensity: { $avg: '$densityPercentage' },
-            maxDensity: { $max: '$densityPercentage' },
-            minDensity: { $min: '$densityPercentage' },
-            dataPoints: { $sum: 1 }
-          }
-        }
-      ]);
+      const stats = await prisma.crowdDensity.aggregate({
+        where,
+        _avg: { peopleCount: true, densityPercentage: true },
+        _max: { peopleCount: true, densityPercentage: true },
+        _min: { peopleCount: true, densityPercentage: true },
+        _count: true,
+      });
 
-      return stats[0] || null;
+      if (stats._count === 0) return null;
+
+      // Get zone name from the first record
+      const firstRecord = await prisma.crowdDensity.findFirst({
+        where: { eventId, zoneId },
+        select: { zoneName: true },
+      });
+
+      return {
+        _id: zoneId,
+        zoneName: firstRecord?.zoneName || zoneId,
+        avgPeopleCount: stats._avg.peopleCount,
+        maxPeopleCount: stats._max.peopleCount,
+        minPeopleCount: stats._min.peopleCount,
+        avgDensity: stats._avg.densityPercentage,
+        maxDensity: stats._max.densityPercentage,
+        minDensity: stats._min.densityPercentage,
+        dataPoints: stats._count,
+      };
     } catch (error: any) {
       console.error('Error fetching zone statistics:', error);
       throw new Error(`Failed to fetch zone statistics: ${error.message}`);
@@ -269,7 +289,7 @@ export class CrowdAnalysisService {
   }
 
   /**
-   * Generate and save mock crowd density data (faster alternative to video processing)
+   * Generate and save mock crowd density data
    */
   async generateAndSaveMockCrowdData(
     eventId: string,
@@ -277,51 +297,47 @@ export class CrowdAnalysisService {
     cameraName?: string
   ) {
     try {
-      // Get event to retrieve zones
-      const event = await Event.findById(eventId);
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        include: { zones: true },
+      });
       if (!event) {
         throw new Error('Event not found');
       }
 
-      // Ensure zones have proper structure
-      let zones = event.zones && event.zones.length > 0 ? event.zones : [
-        { id: 'zone-0', name: 'main stage' },
-        { id: 'zone-1', name: 'food court' },
-        { id: 'zone-2', name: 'vip area' }
+      let zones: any[] = event.zones && event.zones.length > 0 ? event.zones : [
+        { zoneId: 'zone-0', name: 'main stage' },
+        { zoneId: 'zone-1', name: 'food court' },
+        { zoneId: 'zone-2', name: 'vip area' }
       ];
 
-      // Convert zones to proper format if they're just strings
       zones = zones.map((zone: any, index: number) => {
         if (typeof zone === 'string') {
           return { id: `zone-${index}`, name: zone };
         }
         return {
-          id: zone.id || `zone-${index}`,
-          name: zone.name || zone
+          id: zone.zoneId || zone.id || `zone-${index}`,
+          name: zone.name || zone,
         };
       });
 
       console.log('🔍 Event zones:', JSON.stringify(zones, null, 2));
 
-      // Generate mock data for multiple timestamps (simulating video frames)
-      const records: CrowdDensityRecord[] = [];
-      const numFrames = 24; // Simulate 2 minutes of data (24 frames at 5 sec intervals)
-      
+      const records: any[] = [];
+      const numFrames = 24;
+
       for (let i = 0; i < numFrames; i++) {
         const videoSeconds = i * 5;
         const videoTimestamp = `0:${String(Math.floor(videoSeconds / 60)).padStart(2, '0')}:${String(videoSeconds % 60).padStart(2, '0')}`;
-        
+
         zones.forEach((zone: any, zoneIndex: number) => {
-          // Generate realistic varying people counts - higher range for better percentages
-          const baseCount = 5 + Math.floor(Math.random() * 5); // 5-10 people base
-          const variation = Math.floor(Math.random() * 3) - 1; // -1 to +2 variation
-          const peopleCount = Math.max(3, baseCount + variation); // Minimum 3 people
-          
-          // Calculate density with maxCapacity of 10 (gives percentages in 30-100 range)
+          const baseCount = 5 + Math.floor(Math.random() * 5);
+          const variation = Math.floor(Math.random() * 3) - 1;
+          const peopleCount = Math.max(3, baseCount + variation);
           const maxCapacity = 10;
           const densityPercentage = Math.min(100, (peopleCount / maxCapacity) * 100);
-          
-          const record = {
+
+          records.push({
             eventId,
             zoneId: zone.id || `zone-${zoneIndex}`,
             zoneName: zone.name || `Zone ${zoneIndex + 1}`,
@@ -331,33 +347,28 @@ export class CrowdAnalysisService {
             videoTimestamp,
             cameraId: cameraId || 'camera-1',
             cameraName: cameraName || 'Main Camera',
-            metadata: {
-              frameNumber: i,
-              confidence: 0.85 + Math.random() * 0.1,
-              processingTime: 100 + Math.random() * 50
-            }
-          };
-          
-          records.push(record);
+            frameNumber: i,
+            confidence: 0.85 + Math.random() * 0.1,
+            processingTime: 100 + Math.random() * 50,
+          });
         });
       }
 
-      // Save to database
-      const savedRecords = await CrowdDensity.insertMany(records);
+      const result = await prisma.crowdDensity.createMany({ data: records });
 
-      console.log(`✅ Generated ${savedRecords.length} mock crowd density records`);
+      console.log(`✅ Generated ${result.count} mock crowd density records`);
 
       return {
         success: true,
-        recordCount: savedRecords.length,
-        message: `Successfully generated ${savedRecords.length} mock crowd density records`
+        recordCount: result.count,
+        message: `Successfully generated ${result.count} mock crowd density records`,
       };
     } catch (error: any) {
       console.error('Error generating mock crowd data:', error);
       return {
         success: false,
         recordCount: 0,
-        message: error.message
+        message: error.message,
       };
     }
   }
@@ -371,29 +382,54 @@ export class CrowdAnalysisService {
     endTime?: Date
   ) {
     try {
-      const matchQuery: any = { eventId };
+      const where: any = { eventId };
 
       if (startTime || endTime) {
-        matchQuery.timestamp = {};
-        if (startTime) matchQuery.timestamp.$gte = startTime;
-        if (endTime) matchQuery.timestamp.$lte = endTime;
+        where.timestamp = {};
+        if (startTime) where.timestamp.gte = startTime;
+        if (endTime) where.timestamp.lte = endTime;
       }
 
-      const heatmapData = await CrowdDensity.aggregate([
-        { $match: matchQuery },
-        {
-          $group: {
-            _id: {
-              zoneId: '$zoneId',
-              hour: { $hour: '$timestamp' }
-            },
-            zoneName: { $first: '$zoneName' },
-            avgDensity: { $avg: '$densityPercentage' },
-            avgPeopleCount: { $avg: '$peopleCount' }
-          }
-        },
-        { $sort: { '_id.hour': 1 } }
-      ]);
+      // Get all records then group in JS (Prisma doesn't support groupBy with date functions)
+      const records = await prisma.crowdDensity.findMany({
+        where,
+        orderBy: { timestamp: 'asc' },
+      });
+
+      // Group by zoneId and hour
+      const grouped = new Map<string, {
+        zoneId: string;
+        hour: number;
+        zoneName: string;
+        densities: number[];
+        peopleCounts: number[];
+      }>();
+
+      for (const record of records) {
+        const hour = new Date(record.timestamp).getHours();
+        const key = `${record.zoneId}-${hour}`;
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            zoneId: record.zoneId,
+            hour,
+            zoneName: record.zoneName,
+            densities: [],
+            peopleCounts: [],
+          });
+        }
+        const group = grouped.get(key)!;
+        group.densities.push(record.densityPercentage);
+        group.peopleCounts.push(record.peopleCount);
+      }
+
+      const heatmapData = Array.from(grouped.values()).map(g => ({
+        _id: { zoneId: g.zoneId, hour: g.hour },
+        zoneName: g.zoneName,
+        avgDensity: g.densities.reduce((a, b) => a + b, 0) / g.densities.length,
+        avgPeopleCount: g.peopleCounts.reduce((a, b) => a + b, 0) / g.peopleCounts.length,
+      }));
+
+      heatmapData.sort((a, b) => a._id.hour - b._id.hour);
 
       return heatmapData;
     } catch (error: any) {

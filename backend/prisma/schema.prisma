@@ -1,0 +1,314 @@
+// Prisma Schema for Drishti Event Management System
+// PostgreSQL Database with Prisma ORM
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MODEL
+// ============================================
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  password     String
+  role         UserRole @default(PARTICIPANT)
+  organization String?
+  phone        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  organizedEvents Event[]    @relation("OrganizedEvents")
+  registeredEvents EventRegistration[]
+  reportedIncidents Incident[]
+
+  @@index([email])
+  @@index([role])
+  @@map("users")
+}
+
+enum UserRole {
+  ORGANIZER
+  PARTICIPANT
+  ADMIN
+}
+
+// ============================================
+// EVENT MODEL
+// ============================================
+model Event {
+  id              String   @id @default(uuid())
+  name            String
+  type            String
+  date            String
+  time            String
+  crowdSize       Int
+  location        String
+  description     String?
+  mapFile         String?  // Cloudinary URL
+  image           String?
+  organizerId     String
+  organizerEmail  String
+  organizerName   String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  organizer       User      @relation("OrganizedEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  zones           Zone[]
+  cameras         Camera[]
+  dispatchUnits   DispatchUnit[]
+  registrations   EventRegistration[]
+  incidents       Incident[]
+  crowdDensities  CrowdDensity[]
+
+  @@index([organizerId])
+  @@index([date])
+  @@index([type])
+  @@map("events")
+}
+
+// ============================================
+// ZONE MODEL (Sub-entity of Event)
+// ============================================
+model Zone {
+  id           String   @id @default(uuid())
+  eventId      String
+  zoneId       String   // Custom zone identifier
+  name         String
+  coordinates  Json     // Array of {x, y} coordinates
+  maxCapacity  Int
+  color        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  crowdDensities CrowdDensity[]
+
+  @@unique([eventId, zoneId])
+  @@index([eventId])
+  @@map("zones")
+}
+
+// ============================================
+// CAMERA MODEL (Sub-entity of Event)
+// ============================================
+model Camera {
+  id          String   @id @default(uuid())
+  eventId     String
+  cameraId    String   // Custom camera identifier
+  name        String
+  location    String
+  ipAddress   String
+  rtspUrl     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  crowdDensities CrowdDensity[]
+
+  @@unique([eventId, cameraId])
+  @@index([eventId])
+  @@map("cameras")
+}
+
+// ============================================
+// DISPATCH UNIT MODEL (Sub-entity of Event)
+// ============================================
+model DispatchUnit {
+  id          String   @id @default(uuid())
+  eventId     String
+  unitId      String   // Custom unit identifier
+  name        String
+  type        String
+  contact     String
+  capacity    Int
+  location    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, unitId])
+  @@index([eventId])
+  @@map("dispatch_units")
+}
+
+// ============================================
+// EVENT REGISTRATION MODEL (Many-to-Many)
+// ============================================
+model EventRegistration {
+  id          String   @id @default(uuid())
+  userId      String
+  eventId     String
+  registeredAt DateTime @default(now())
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@index([userId])
+  @@index([eventId])
+  @@map("event_registrations")
+}
+
+// ============================================
+// INCIDENT MODEL
+// ============================================
+model Incident {
+  id              String         @id @default(uuid())
+  eventId         String
+  type            IncidentType
+  description     String
+  location        String
+  timestamp       DateTime       @default(now())
+  reporter        String
+  reporterEmail   String?
+  status          IncidentStatus @default(OPEN)
+  responseTime    Int?           // in seconds
+  resolvedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  // Relations
+  event           Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  reporterUser    User           @relation(fields: [reporter], references: [id])
+
+  @@index([eventId])
+  @@index([eventId, status])
+  @@index([eventId, timestamp])
+  @@index([status])
+  @@map("incidents")
+}
+
+enum IncidentType {
+  MEDICAL
+  SECURITY
+  LOST_FOUND
+  GENERAL
+}
+
+enum IncidentStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+}
+
+// ============================================
+// CROWD DENSITY MODEL
+// ============================================
+model CrowdDensity {
+  id                String   @id @default(uuid())
+  eventId           String
+  zoneId            String
+  zoneName          String
+  peopleCount       Int
+  densityPercentage Float
+  timestamp         DateTime
+  videoTimestamp    String   // Format: HH:MM:SS
+  cameraId          String?
+  cameraName        String?
+  
+  // Metadata fields
+  frameNumber       Int?
+  confidence        Float?
+  processingTime    Float?
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  event             Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  zone              Zone?    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  camera            Camera?  @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+
+  @@index([eventId])
+  @@index([zoneId])
+  @@index([eventId, zoneId, timestamp])
+  @@index([eventId, timestamp])
+  @@index([timestamp])
+  @@map("crowd_densities")
+}
+
+// ============================================
+// ADDITIONAL UTILITY MODELS
+// ============================================
+
+// AI Summary/Analysis Cache
+model AISummary {
+  id          String   @id @default(uuid())
+  entityType  String   // 'event', 'incident', 'crowd_analysis'
+  entityId    String
+  summaryType String   // 'general', 'risk', 'recommendation'
+  content     String   @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@map("ai_summaries")
+}
+
+// System Logs for audit trail
+model SystemLog {
+  id          String   @id @default(uuid())
+  action      String
+  userId      String?
+  eventId     String?
+  description String   @db.Text
+  metadata    Json?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([eventId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("system_logs")
+}
+
+// Notification table for real-time alerts
+model Notification {
+  id          String           @id @default(uuid())
+  userId      String?
+  eventId     String?
+  type        NotificationType
+  title       String
+  message     String           @db.Text
+  isRead      Boolean          @default(false)
+  priority    NotificationPriority @default(NORMAL)
+  metadata    Json?
+  createdAt   DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([eventId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  INCIDENT
+  CROWD_ALERT
+  SYSTEM
+  EVENT_UPDATE
+  GENERAL
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}

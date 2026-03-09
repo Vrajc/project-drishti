@@ -63,14 +63,13 @@ app.get('/health', (req: Request, res: Response) => {
 // Start server
 const startServer = async () => {
   try {
-    // Connect to database (comment out if MongoDB is not running)
+    // Connect to database
     try {
       await connectDatabase();
-      // Seed test user after successful connection
       await seedTestUser();
     } catch (dbError) {
-      console.warn('⚠️  MongoDB connection failed - running without database');
-      console.warn('Start MongoDB to enable database features');
+      console.warn('⚠️  PostgreSQL connection failed - running without database');
+      console.warn('Start PostgreSQL (Docker) to enable database features');
     }
     
     const server = app.listen(PORT, () => {

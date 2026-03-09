@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/user.model';
+import prisma from '../lib/prisma';
 
 // Validation helper functions
 const validateGmail = (email: string): boolean => {
@@ -46,8 +46,10 @@ export const register = async (req: Request, res: Response) => {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email: email.toLowerCase() });
-    
+    const existingUser = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
     if (existingUser) {
       return res.status(400).json({ message: 'User already exists with this email. Please login instead.' });
     }
@@ -56,18 +58,26 @@ export const register = async (req: Request, res: Response) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // Map role string to enum
+    const roleMap: Record<string, 'ORGANIZER' | 'PARTICIPANT' | 'ADMIN'> = {
+      organizer: 'ORGANIZER',
+      participant: 'PARTICIPANT',
+      admin: 'ADMIN',
+    };
+
     // Save to database
-    const user = new User({
-      name,
-      email: email.toLowerCase(),
-      password: hashedPassword,
-      role: role || 'participant',
+    const user = await prisma.user.create({
+      data: {
+        name,
+        email: email.toLowerCase(),
+        password: hashedPassword,
+        role: roleMap[role] || 'PARTICIPANT',
+      },
     });
-    await user.save();
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user.id, role: user.role.toLowerCase() },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
@@ -77,10 +87,10 @@ export const register = async (req: Request, res: Response) => {
       message: 'User registered successfully',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role.toLowerCase(),
       },
     });
   } catch (error: any) {
@@ -104,15 +114,17 @@ export const login = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Email must be a Gmail address (@gmail.com)' });
     }
 
-    // Find user by email in MongoDB
-    const user = await User.findOne({ email: email.toLowerCase() });
-    
+    // Find user by email
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
+
     if (!user) {
       return res.status(401).json({ message: 'User not found. Please sign up first.' });
     }
 
     // Check if role matches (optional check)
-    if (role && user.role !== role) {
+    if (role && user.role.toLowerCase() !== role) {
       return res.status(401).json({ message: `Invalid credentials for ${role} role` });
     }
 
@@ -124,7 +136,7 @@ export const login = async (req: Request, res: Response) => {
 
     // Generate JWT token
     const token = jwt.sign(
-      { userId: user._id, role: user.role },
+      { userId: user.id, role: user.role.toLowerCase() },
       process.env.JWT_SECRET || 'your-secret-key',
       { expiresIn: '7d' }
     );
@@ -134,10 +146,10 @@ export const login = async (req: Request, res: Response) => {
       message: 'Login successful',
       token,
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role.toLowerCase(),
       },
     });
   } catch (error: any) {
@@ -150,7 +162,17 @@ export const login = async (req: Request, res: Response) => {
 export const getProfile = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.userId;
-    const user = await User.findById(userId).select('-password');
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        organization: true,
+        phone: true,
+      },
+    });
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -158,10 +180,10 @@ export const getProfile = async (req: Request, res: Response) => {
 
     res.status(200).json({
       user: {
-        id: user._id,
+        id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
+        role: user.role.toLowerCase(),
         organization: user.organization,
         phone: user.phone,
       },
