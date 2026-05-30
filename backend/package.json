@@ -5,18 +5,18 @@
   "main": "dist/server.js",
   "type": "module",
   "scripts": {
-    "prebuild": "prisma generate",
-    "predev": "prisma generate",
-    "prestart": "prisma generate",
-    "dev": "tsx watch src/server.ts",
+    "prebuild": "npx prisma generate",
+    "predev": "npx prisma generate",
+    "prestart": "npx prisma generate",
+    "dev": "npx tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
-    "prisma:generate": "prisma generate",
-    "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
-    "prisma:deploy": "prisma migrate deploy",
-    "prisma:reset": "prisma migrate reset"
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate": "npx prisma migrate dev",
+    "prisma:studio": "npx prisma studio",
+    "prisma:deploy": "npx prisma migrate deploy",
+    "prisma:reset": "npx prisma migrate reset"
   },
   "keywords": [
     "event-safety",
