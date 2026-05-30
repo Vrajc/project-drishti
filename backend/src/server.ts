@@ -17,6 +17,7 @@ dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
+const requiresDatabase = process.env.NODE_ENV === 'production' || process.env.REQUIRE_DATABASE === 'true';
 
 // Middleware
 // Configure CORS to allow requests from frontend
@@ -63,11 +64,22 @@ app.get('/health', (req: Request, res: Response) => {
 // Start server
 const startServer = async () => {
   try {
+    if (requiresDatabase && !process.env.DATABASE_URL) {
+      console.error('❌ DATABASE_URL is required in production. Set it in your deployment environment variables.');
+      process.exit(1);
+    }
+
     // Connect to database
     try {
       await connectDatabase();
       await seedTestUser();
     } catch (dbError) {
+      if (requiresDatabase) {
+        console.error('❌ Prisma Postgres connection failed in production.');
+        console.error('Check DATABASE_URL, database network access, and applied migrations.');
+        throw dbError;
+      }
+
       console.warn('⚠️  Prisma Postgres connection failed - running without database');
       console.warn('Check your Prisma Postgres DATABASE_URL and network access');
     }

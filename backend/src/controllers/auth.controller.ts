@@ -3,6 +3,20 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
 
+const getPrismaErrorResponse = (error: any) => {
+  const code = error?.code as string | undefined;
+
+  if (code === 'P1001' || code === 'P1002') {
+    return { status: 503, message: 'Database is unavailable. Please try again later.' };
+  }
+
+  if (code === 'P2021') {
+    return { status: 500, message: 'Database schema is not ready. Please contact support.' };
+  }
+
+  return { status: 500, message: null as string | null };
+};
+
 // Validation helper functions
 const validateGmail = (email: string): boolean => {
   return email.endsWith('@gmail.com');
@@ -95,7 +109,11 @@ export const register = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Registration error:', error);
-    res.status(500).json({ message: 'Error creating user', error: error.message });
+    const prismaError = getPrismaErrorResponse(error);
+    res.status(prismaError.status).json({
+      message: prismaError.message || 'Error creating user',
+      error: error.message,
+    });
   }
 };
 
@@ -154,7 +172,11 @@ export const login = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Login error:', error);
-    res.status(500).json({ message: 'Error logging in', error: error.message });
+    const prismaError = getPrismaErrorResponse(error);
+    res.status(prismaError.status).json({
+      message: prismaError.message || 'Error logging in',
+      error: error.message,
+    });
   }
 };
 
@@ -190,7 +212,11 @@ export const getProfile = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Get profile error:', error);
-    res.status(500).json({ message: 'Error fetching profile', error: error.message });
+    const prismaError = getPrismaErrorResponse(error);
+    res.status(prismaError.status).json({
+      message: prismaError.message || 'Error fetching profile',
+      error: error.message,
+    });
   }
 };
 
