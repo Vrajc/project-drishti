@@ -68,8 +68,8 @@ const startServer = async () => {
       await connectDatabase();
       await seedTestUser();
     } catch (dbError) {
-      console.warn('⚠️  PostgreSQL connection failed - running without database');
-      console.warn('Start PostgreSQL (Docker) to enable database features');
+      console.warn('⚠️  Prisma Postgres connection failed - running without database');
+      console.warn('Check your Prisma Postgres DATABASE_URL and network access');
     }
     
     const server = app.listen(PORT, () => {
