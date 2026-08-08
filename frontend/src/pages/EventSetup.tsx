@@ -165,17 +165,17 @@ const EventSetup: React.FC = () => {
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               Event Setup
             </h1>
-            <p className="text-ai-gray-400 text-lg">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg">
               Configure your event details to enable AI-powered safety features
             </p>
           </motion.div>
@@ -184,11 +184,11 @@ const EventSetup: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="glass-light rounded-2xl p-8"
+            className="glass-light rounded-2xl p-4 sm:p-6 lg:p-8"
           >
-            <form onSubmit={handleSubmit} className="space-y-8">
+            <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
               {/* Basic Information */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-sm font-medium text-ai-gray-300 mb-2">
                     Event Name
@@ -222,7 +222,7 @@ const EventSetup: React.FC = () => {
               </div>
 
               {/* Date and Time */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-sm font-medium text-ai-gray-300 mb-2">
                     <Calendar className="w-4 h-4 inline mr-2" />
@@ -253,7 +253,7 @@ const EventSetup: React.FC = () => {
               </div>
 
               {/* Location and Crowd Size */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <div>
                   <label className="block text-sm font-medium text-ai-gray-300 mb-2">
                     <MapPin className="w-4 h-4 inline mr-2" />
@@ -306,13 +306,13 @@ const EventSetup: React.FC = () => {
                 <label className="block text-sm font-medium text-ai-gray-300 mb-2">
                   Event Zones
                 </label>
-                <div className="flex gap-2 mb-3">
+                <div className="flex flex-col xs:flex-row gap-2 mb-3">
                   <input
                     type="text"
                     value={newZone}
                     onChange={(e) => setNewZone(e.target.value)}
-                    className="flex-1 px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
-                    placeholder="Add zone (e.g., Main Stage, VIP Area, Food Court)"
+                    className="flex-1 min-w-0 px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
+                    placeholder="Add zone (e.g., Main Stage)"
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addZone())}
                   />
                   <motion.button
@@ -320,7 +320,7 @@ const EventSetup: React.FC = () => {
                     whileTap={{ scale: 0.95 }}
                     type="button"
                     onClick={addZone}
-                    className="px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors"
+                    className="shrink-0 px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors"
                   >
                     Add
                   </motion.button>
@@ -331,13 +331,14 @@ const EventSetup: React.FC = () => {
                       key={zone}
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="px-3 py-1 bg-ai-gray-600/20 text-ai-gray-300 rounded-full text-sm flex items-center gap-2"
+                      className="pl-3 pr-1 py-1 bg-ai-gray-600/20 text-ai-gray-300 rounded-full text-sm flex items-center gap-1 max-w-full"
                     >
-                      {zone}
+                      <span className="truncate">{zone}</span>
                       <button
                         type="button"
                         onClick={() => removeZone(zone)}
-                        className="text-ai-gray-400 hover:text-white"
+                        aria-label={`Remove ${zone}`}
+                        className="shrink-0 w-6 h-6 leading-none flex items-center justify-center rounded-full text-ai-gray-400 hover:text-white hover:bg-ai-gray-700/50 transition-colors"
                       >
                         ×
                       </button>
@@ -353,7 +354,7 @@ const EventSetup: React.FC = () => {
                   Camera Inputs
                 </label>
                 <div className="space-y-3 mb-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
                       value={newCamera.name}
@@ -369,7 +370,7 @@ const EventSetup: React.FC = () => {
                       placeholder="Location (e.g., North Entrance)"
                     />
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
                       value={newCamera.ipAddress}
@@ -403,13 +404,13 @@ const EventSetup: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       className="p-4 bg-ai-gray-800/30 border border-ai-gray-800 rounded-xl"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
-                            <Video className="w-4 h-4 text-ai-gray-400" />
-                            <h4 className="font-medium text-white">{camera.name}</h4>
+                            <Video className="w-4 h-4 text-ai-gray-400 shrink-0" />
+                            <h4 className="font-medium text-white break-anywhere">{camera.name}</h4>
                           </div>
-                          <div className="text-sm text-ai-gray-400 space-y-1">
+                          <div className="text-xs sm:text-sm text-ai-gray-400 space-y-1 break-anywhere">
                             <p>📍 Location: {camera.location}</p>
                             {camera.ipAddress && <p>🌐 IP: {camera.ipAddress}</p>}
                             {camera.rtspUrl && <p>🔗 RTSP: {camera.rtspUrl}</p>}
@@ -418,7 +419,7 @@ const EventSetup: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => removeCamera(camera.id)}
-                          className="text-ai-gray-400 hover:text-red-500 transition-colors"
+                          className="icon-btn shrink-0 p-1 text-ai-gray-400 hover:text-red-500 transition-colors"
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -435,7 +436,7 @@ const EventSetup: React.FC = () => {
                   Emergency Dispatch Units
                 </label>
                 <div className="space-y-3 mb-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <input
                       type="text"
                       value={newDispatchUnit.name}
@@ -455,7 +456,7 @@ const EventSetup: React.FC = () => {
                       ))}
                     </select>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
                     <input
                       type="tel"
                       value={newDispatchUnit.contact}
@@ -497,18 +498,18 @@ const EventSetup: React.FC = () => {
                       animate={{ opacity: 1, y: 0 }}
                       className="p-4 bg-ai-gray-800/30 border border-ai-gray-800 rounded-xl"
                     >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Truck className="w-4 h-4 text-ai-gray-400" />
-                            <h4 className="font-medium text-white">{unit.name}</h4>
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-2">
+                            <Truck className="w-4 h-4 text-ai-gray-400 shrink-0" />
+                            <h4 className="font-medium text-white break-anywhere">{unit.name}</h4>
                             <span className="px-2 py-0.5 bg-ai-gray-700 text-ai-gray-300 text-xs rounded-full">
                               {unit.type.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                             </span>
                           </div>
-                          <div className="text-sm text-ai-gray-400 space-y-1">
+                          <div className="text-xs sm:text-sm text-ai-gray-400 space-y-1 break-anywhere">
                             <p className="flex items-center gap-2">
-                              <Phone className="w-3 h-3" /> {unit.contact}
+                              <Phone className="w-3 h-3 shrink-0" /> {unit.contact}
                             </p>
                             <p className="flex items-center gap-2">
                               <Users className="w-3 h-3" /> Capacity: {unit.capacity}
@@ -519,7 +520,7 @@ const EventSetup: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => removeDispatchUnit(unit.id)}
-                          className="text-ai-gray-400 hover:text-red-500 transition-colors"
+                          className="icon-btn shrink-0 p-1 text-ai-gray-400 hover:text-red-500 transition-colors"
                         >
                           <X className="w-5 h-5" />
                         </button>
@@ -535,7 +536,7 @@ const EventSetup: React.FC = () => {
                   <Upload className="w-4 h-4 inline mr-2" />
                   Event Map (Optional)
                 </label>
-                <div className="border-2 border-dashed border-ai-gray-800 rounded-xl p-6 text-center hover:border-ai-white transition-colors">
+                <div className="border-2 border-dashed border-ai-gray-800 rounded-xl p-4 sm:p-6 text-center hover:border-ai-white transition-colors">
                   <input
                     type="file"
                     accept="image/*,.pdf"
@@ -545,7 +546,7 @@ const EventSetup: React.FC = () => {
                   />
                   <label htmlFor="map-upload" className="cursor-pointer">
                     <Upload className="w-8 h-8 mx-auto mb-2 text-ai-gray-400" />
-                    <p className="text-ai-gray-400">
+                    <p className="text-sm sm:text-base text-ai-gray-400 break-anywhere">
                       {formData.mapFile ? formData.mapFile.name : 'Upload venue map or floor plan'}
                     </p>
                   </label>
@@ -553,13 +554,13 @@ const EventSetup: React.FC = () => {
               </div>
 
               {/* Submit */}
-              <div className="flex justify-end">
+              <div className="flex justify-stretch sm:justify-end">
                 <motion.button
                   whileHover={{ scale: isSubmitting ? 1 : 1.05 }}
                   whileTap={{ scale: isSubmitting ? 1 : 0.95 }}
                   type="submit"
                   disabled={isSubmitting}
-                  className={`px-8 py-3 rounded-xl transition-colors flex items-center gap-2 ${
+                  className={`w-full sm:w-auto justify-center px-6 sm:px-8 py-3 rounded-xl transition-colors flex items-center gap-2 ${
                     isSubmitting 
                       ? 'bg-ai-gray-600 text-ai-gray-400 cursor-not-allowed' 
                       : 'bg-ai-white text-ai-black hover:bg-ai-gray-300'

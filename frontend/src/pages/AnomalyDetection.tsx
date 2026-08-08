@@ -194,55 +194,55 @@ const AnomalyDetection: React.FC = () => {
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <Eye className="w-16 h-16 mx-auto mb-4 text-ai-white" />
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <Eye className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               Anomaly Detection
             </h1>
-            <p className="text-ai-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto">
               Real-time multimodal detection of fires, emergencies, and safety threats using AI-powered video analysis
             </p>
           </motion.div>
 
           {/* Stats Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="glass-light rounded-2xl p-6 text-center">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <Eye className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">{stats.camerasActive}/{stats.totalCameras}</div>
-              <div className="text-sm text-ai-gray-400">Cameras Active</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{stats.camerasActive}/{stats.totalCameras}</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Cameras Active</div>
             </div>
             
-            <div className="glass-light rounded-2xl p-6 text-center">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">{activeAlerts.length}</div>
-              <div className="text-sm text-ai-gray-400">Active Alerts</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{activeAlerts.length}</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Active Alerts</div>
             </div>
             
-            <div className="glass-light rounded-2xl p-6 text-center">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <Flame className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">{criticalAlerts.length}</div>
-              <div className="text-sm text-ai-gray-400">Critical Events</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{criticalAlerts.length}</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Critical Events</div>
             </div>
             
-            <div className="glass-light rounded-2xl p-6 text-center">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <Clock className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">{stats.avgResponseTime > 0 ? `${stats.avgResponseTime}m` : '-'}</div>
-              <div className="text-sm text-ai-gray-400">Avg Response</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{stats.avgResponseTime > 0 ? `${stats.avgResponseTime}m` : '-'}</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Avg Response</div>
             </div>
           </div>
 
           {/* Control Panel */}
-          <div className="glass-light rounded-2xl p-6 mb-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h3 className="text-xl font-semibold text-white mb-2">AI Monitoring System</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">AI Monitoring System</h3>
                 <p className="text-ai-gray-400">Advanced computer vision for real-time threat detection</p>
               </div>
               <div className="flex items-center gap-4">
@@ -255,7 +255,7 @@ const AnomalyDetection: React.FC = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={toggleMonitoring}
-                  className="px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors"
+                  className="px-4 sm:px-6 py-3 bg-ai-white text-ai-black rounded-xl text-sm sm:text-base whitespace-nowrap hover:bg-ai-gray-300 transition-colors"
                 >
                   {isMonitoring ? 'Stop Monitoring' : 'Start Monitoring'}
                 </motion.button>
@@ -298,8 +298,8 @@ const AnomalyDetection: React.FC = () => {
               transition={{ delay: 0.4 }}
               className="mb-8"
             >
-              <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-                <AlertTriangle className="w-6 h-6 text-ai-white" />
+              <h3 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6 flex flex-wrap items-center gap-2">
+                <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white shrink-0" />
                 Real-time Alerts
                 {activeAlerts.length > 0 && (
                   <span className="bg-ai-white/20 text-ai-white px-2 py-1 rounded-full text-sm">
@@ -309,31 +309,31 @@ const AnomalyDetection: React.FC = () => {
               </h3>
               
               {alerts.length === 0 ? (
-                <div className="glass-light rounded-2xl p-12 text-center">
+                <div className="glass-light rounded-2xl p-6 sm:p-12 text-center">
                   <Eye className="w-16 h-16 mx-auto mb-4 text-ai-gray-700" />
-                  <p className="text-ai-gray-400 text-lg">Monitoring active - No anomalies detected</p>
+                  <p className="text-ai-gray-400 text-base sm:text-lg">Monitoring active - No anomalies detected</p>
                   <p className="text-ai-gray-500 text-sm mt-2">System is analyzing camera feeds in real-time</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                {alerts.slice(0, 6).map((alert, index) => {
+                {alerts.slice(0, 6).map((alert) => {
                   const AlertIcon = alertTypes[alert.type].icon;
                   const alertColor = alertTypes[alert.type].color;
                   
                   return (
                     <div
                       key={alert.id}
-                      className={`glass-light rounded-2xl p-6 border-l-4 ${severityColors[alert.severity]}`}
+                      className={`glass-light rounded-2xl p-4 sm:p-6 border-l-4 ${severityColors[alert.severity]}`}
                     >
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-4 flex-1">
-                          <div className={`w-12 h-12 ${alertColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                            <AlertIcon className="w-6 h-6 text-white" />
+                        <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                          <div className={`w-10 h-10 sm:w-12 sm:h-12 ${alertColor} rounded-xl flex items-center justify-center flex-shrink-0`}>
+                            <AlertIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                           </div>
                           
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h4 className="text-lg font-semibold text-white">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+                              <h4 className="text-base sm:text-lg font-semibold text-white">
                                 {alertTypes[alert.type].label}
                               </h4>
                               <span className={`px-2 py-1 rounded-full text-xs ${
@@ -349,10 +349,10 @@ const AnomalyDetection: React.FC = () => {
                               </span>
                             </div>
                             
-                            <p className="text-ai-gray-400 mb-2">{alert.description}</p>
+                            <p className="text-sm sm:text-base text-ai-gray-400 mb-2 break-anywhere">{alert.description}</p>
                             
-                            <div className="flex items-center gap-4 text-sm">
-                              <span className="text-ai-white">📍 {alert.location}</span>
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm">
+                              <span className="text-ai-white break-anywhere">📍 {alert.location}</span>
                               <span className="text-ai-gray-500">
                                 {alert.timestamp.toLocaleTimeString()}
                               </span>
@@ -363,7 +363,7 @@ const AnomalyDetection: React.FC = () => {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           {alert.status === 'active' && (
                             <motion.button
                               whileHover={{ scale: 1.05 }}
@@ -389,29 +389,29 @@ const AnomalyDetection: React.FC = () => {
 
           {/* Camera Grid Simulation */}
           {isMonitoring && (
-            <div className="glass-light rounded-2xl p-6">
-              <h3 className="text-xl font-semibold text-white mb-6">Live Camera Feeds</h3>
+            <div className="glass-light rounded-2xl p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6">Live Camera Feeds</h3>
               {eventCameras.length === 0 ? (
                 <div className="text-center py-12">
                   <Eye className="w-16 h-16 text-ai-gray-700 mx-auto mb-4" />
-                  <p className="text-ai-gray-400 text-lg">No cameras configured</p>
+                  <p className="text-ai-gray-400 text-base sm:text-lg">No cameras configured</p>
                   <p className="text-ai-gray-500 text-sm mt-2">Add cameras during event setup to enable monitoring</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {eventCameras.map((camera, i) => (
+                <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  {eventCameras.map((camera) => (
                     <div key={camera.id} className="aspect-video bg-ai-gray-800/50 rounded-lg relative overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-br from-ai-gray-700 to-ai-gray-800 opacity-50" />
                       <div className="absolute inset-0 flex items-center justify-center">
                         <Eye className="w-8 h-8 text-ai-gray-500" />
                       </div>
                       <div className="absolute top-2 left-2">
-                        <div className="bg-black/50 rounded px-2 py-1 text-xs text-white">
+                        <div className="bg-black/50 rounded px-2 py-1 text-xs text-white max-w-[9rem] truncate">
                           {camera.name}
                         </div>
                       </div>
                       <div className="absolute bottom-2 left-2">
-                        <div className="bg-black/50 rounded px-2 py-1 text-xs text-ai-gray-400">
+                        <div className="bg-black/50 rounded px-2 py-1 text-xs text-ai-gray-400 max-w-[9rem] truncate">
                           📍 {camera.location}
                         </div>
                       </div>

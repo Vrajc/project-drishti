@@ -72,21 +72,24 @@ const Landing: React.FC = () => {
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         className="fixed top-0 left-0 right-0 z-50 glassmorphism border-b border-ai-gray-800"
+        style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
-        <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-ai-white rounded flex items-center justify-center">
-                <span className="text-ai-black font-bold text-lg">✦</span>
+        <div className="page-container">
+          <div className="flex justify-between items-center h-16 gap-2">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-ai-white rounded flex items-center justify-center shrink-0">
+                <span className="text-ai-black font-bold text-base sm:text-lg">✦</span>
               </div>
-              <span className="text-xl font-bold tracking-tight">Drishti</span>
+              <span className="text-lg sm:text-xl font-bold tracking-tight">Drishti</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               <GradientButton onClick={() => navigate('/login')} variant="ghost">
                 Login
               </GradientButton>
+              {/* Full label needs more room than a 320px header has */}
               <GradientButton onClick={() => navigate('/register')} variant="primary">
-                Get Started
+                <span className="hidden xs:inline">Get Started</span>
+                <span className="xs:hidden">Start</span>
               </GradientButton>
             </div>
           </div>
@@ -94,16 +97,18 @@ const Landing: React.FC = () => {
       </motion.header>
 
       {/* Hero Section */}
-      <section className="relative pt-32 pb-24 min-h-screen flex items-center">
-        <motion.div 
-          className="w-full px-4 sm:px-6 lg:px-8 relative z-10 w-full"
+      <section className="relative pt-24 sm:pt-32 pb-16 sm:pb-24 min-h-screen-safe hero-min-h flex items-center">
+        <motion.div
+          className="page-container relative z-10"
           style={{ opacity, scale }}
         >
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Left: Text Content */}
-            <div className="space-y-8">
-              {/* Animated Hero headline */}
-              <AnimatedHeroText className="text-6xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-none">
+            <div className="space-y-6 sm:space-y-8">
+              {/* Animated Hero headline.
+                  Starts at text-4xl so "AI-Powered" fits a 320px screen
+                  without hyphenating. */}
+              <AnimatedHeroText className="text-4xl xs:text-5xl sm:text-6xl md:text-7xl lg:text-7xl xl:text-8xl font-bold tracking-tight leading-none">
                 AI-Powered Event Safety
               </AnimatedHeroText>
 
@@ -112,10 +117,11 @@ const Landing: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.6 }}
-                className="text-lg md:text-xl text-ai-gray-400 leading-relaxed font-light max-w-xl"
+                className="text-base sm:text-lg md:text-xl text-ai-gray-400 leading-relaxed font-light max-w-xl"
               >
                 Predict risks. Detect emergencies. Coordinate responses.
-                <br />
+                {/* Break only where there's room for two balanced lines */}
+                <br className="hidden sm:inline" />{' '}
                 Advanced AI for large-scale public safety.
               </motion.p>
 
@@ -124,7 +130,7 @@ const Landing: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 0.8 }}
-                className="flex flex-col sm:flex-row gap-4 items-start"
+                className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-start"
               >
                 <HeroButtonExpandable 
                   onClick={() => navigate('/register')}
@@ -142,9 +148,9 @@ const Landing: React.FC = () => {
                 {/* Live AI Status Indicator */}
                 <motion.div
                   whileHover={{ scale: 1.02 }}
-                  className="relative group cursor-default w-[200px]"
+                  className="relative group cursor-default w-full sm:w-[200px]"
                 >
-                  <div className="glassmorphism border border-ai-gray-800 rounded-xl px-6 py-4 h-full">
+                  <div className="glassmorphism border border-ai-gray-800 rounded-xl px-5 sm:px-6 py-4 h-full">
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
@@ -175,7 +181,7 @@ const Landing: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, delay: 1 }}
-                className="grid grid-cols-3 gap-6 pt-8 border-t border-border-subtle"
+                className="grid grid-cols-3 gap-3 sm:gap-6 pt-6 sm:pt-8 border-t border-border-subtle"
               >
                 {[
                   { value: '15-20min', label: 'Early Warning' },
@@ -188,15 +194,20 @@ const Landing: React.FC = () => {
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 1.2 + index * 0.1 }}
                   >
-                    <div className="text-2xl md:text-3xl font-bold text-ai-white mb-1">{stat.value}</div>
-                    <div className="text-sm text-ai-gray-500 font-light">{stat.label}</div>
+                    {/* Values like "15-20min" need to shrink to fit three
+                        columns across a 320px viewport */}
+                    <div className="text-lg xs:text-xl sm:text-2xl md:text-3xl font-bold text-ai-white mb-1 whitespace-nowrap">{stat.value}</div>
+                    <div className="text-xs sm:text-sm text-ai-gray-500 font-light">{stat.label}</div>
                   </motion.div>
                 ))}
               </motion.div>
             </div>
 
-            {/* Right: 3D Spline Scene with centered logo */}
-            <div className="relative h-[500px] lg:h-[600px]">
+            {/* Right: 3D Spline Scene with centered logo.
+                Shorter on phones so the hero copy above it still fits the
+                first screen; hidden entirely in landscape where vertical
+                space is the scarce resource. */}
+            <div className="relative h-[280px] sm:h-[400px] lg:h-[600px] short:hidden lg:short:block">
               {/* Logo in exact center of circular animation */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -205,8 +216,8 @@ const Landing: React.FC = () => {
                 className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none"
               >
                 <div className="relative">
-                  <div className="w-20 h-20 bg-ai-white rounded-xl flex items-center justify-center shadow-2xl">
-                    <span className="text-ai-black font-bold text-4xl">✦</span>
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 bg-ai-white rounded-xl flex items-center justify-center shadow-2xl">
+                    <span className="text-ai-black font-bold text-2xl sm:text-3xl lg:text-4xl">✦</span>
                   </div>
                   {/* Animated rings */}
                   <motion.div
@@ -265,9 +276,9 @@ const Landing: React.FC = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 relative">
-        <motion.div 
-          className="w-full px-4 sm:px-6 lg:px-8 relative z-10"
+      <section className="py-16 sm:py-20 lg:py-24 relative">
+        <motion.div
+          className="page-container relative z-10"
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true, margin: "-100px" }}
@@ -278,7 +289,7 @@ const Landing: React.FC = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             viewport={{ once: true }}
-            className="text-center mb-16"
+            className="text-center mb-10 sm:mb-16"
           >
             {/* Section label */}
             <motion.div 
@@ -289,18 +300,18 @@ const Landing: React.FC = () => {
               <span className="text-sm text-ai-gray-400 font-medium">Six Core Capabilities</span>
             </motion.div>
             
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 tracking-tight">
+            <h2 className="text-2xl xs:text-3xl md:text-5xl font-bold mb-4 sm:mb-6 tracking-tight">
               <span className="text-ai-white">Comprehensive Safety</span>
               <br />
               <span className="text-ai-gray-500">Infrastructure</span>
             </h2>
-            <p className="text-ai-gray-400 text-base md:text-lg max-w-2xl mx-auto font-light">
+            <p className="text-ai-gray-400 text-sm sm:text-base md:text-lg max-w-2xl mx-auto font-light">
               Six integrated AI systems working together to ensure complete event oversight
             </p>
           </motion.div>
 
           <motion.div 
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6"
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-50px" }}
@@ -312,7 +323,7 @@ const Landing: React.FC = () => {
               }
             }}
           >
-            {features.map((feature, index) => (
+            {features.map((feature) => (
               <motion.div
                 key={feature.title}
                 variants={{
@@ -333,14 +344,14 @@ const Landing: React.FC = () => {
       </section>
 
       {/* CTA Section */}
-      <section className="py-24 relative">
-        <div className="w-full px-4 sm:px-6 lg:px-8 text-center relative z-10">
+      <section className="py-16 sm:py-20 lg:py-24 relative">
+        <div className="page-container text-center relative z-10">
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
             viewport={{ once: true, margin: "-100px" }}
-            className="glassmorphism rounded-2xl p-12 md:p-16 border border-ai-gray-800 relative overflow-hidden group"
+            className="glassmorphism rounded-2xl p-6 sm:p-10 md:p-16 border border-ai-gray-800 relative overflow-hidden group"
             whileHover={{ scale: 1.02 }}
           >
             {/* Animated background gradient on hover */}
@@ -356,7 +367,7 @@ const Landing: React.FC = () => {
             
             <div className="relative z-10">
               <motion.h3 
-                className="text-3xl md:text-4xl font-bold mb-6 text-ai-white tracking-tight"
+                className="text-2xl xs:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-ai-white tracking-tight"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
@@ -368,7 +379,7 @@ const Landing: React.FC = () => {
               </motion.h3>
               
               <motion.p 
-                className="text-ai-gray-400 text-base md:text-lg mb-10 max-w-2xl mx-auto font-light"
+                className="text-ai-gray-400 text-sm sm:text-base md:text-lg mb-8 sm:mb-10 max-w-2xl mx-auto font-light"
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
@@ -388,9 +399,9 @@ const Landing: React.FC = () => {
                 <GradientButton 
                   onClick={() => navigate('/register')} 
                   variant="primary"
-                  className="text-base px-10 py-4 flex items-center gap-2 mx-auto"
+                  className="text-sm sm:text-base !px-6 sm:!px-10 !py-3.5 sm:!py-4 flex items-center justify-center gap-2 mx-auto w-full sm:w-auto"
                 >
-                  Get Started Now <ArrowRight className="w-5 h-5" />
+                  Get Started Now <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
                 </GradientButton>
               </motion.div>
             </div>
@@ -402,9 +413,9 @@ const Landing: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="py-8 border-t border-ai-gray-900 relative z-10">
-        <div className="w-full px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-ai-gray-600 text-sm font-light">
+      <footer className="py-8 border-t border-ai-gray-900 relative z-10 safe-bottom">
+        <div className="page-container text-center">
+          <p className="text-ai-gray-600 text-xs sm:text-sm font-light">
             © 2025 Drishti. Built for hackathon demonstration. Privacy-first design.
           </p>
         </div>

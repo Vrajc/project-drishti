@@ -10,7 +10,7 @@ import { generateEventReport } from '../services/ai.service';
 import { generatePDFReport } from '../utils/pdfGenerator';
 
 const PostEventReports: React.FC = () => {
-  const { event, getEventsByOrganizer } = useEvent();
+  const { event } = useEvent();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -154,94 +154,94 @@ const PostEventReports: React.FC = () => {
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <FileText className="w-16 h-16 mx-auto mb-4 text-ai-white" />
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <FileText className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               Post-Event Reports
             </h1>
-            <p className="text-ai-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto">
               Comprehensive safety analysis and insights for continuous improvement
             </p>
           </motion.div>
 
           {/* Event Summary */}
           {!eventData ? (
-            <div className="glass-light rounded-2xl p-12 mb-8 text-center">
+            <div className="glass-light rounded-2xl p-6 sm:p-12 mb-6 sm:mb-8 text-center">
               <FileText className="w-16 h-16 mx-auto mb-4 text-ai-gray-700" />
-              <h3 className="text-xl font-semibold text-white mb-2">No Event Data Available</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No Event Data Available</h3>
               <p className="text-ai-gray-400">Set up an event first to generate post-event reports</p>
             </div>
           ) : !isEventCompleted ? (
-            <div className="glass-light rounded-2xl p-12 mb-8 text-center">
+            <div className="glass-light rounded-2xl p-6 sm:p-12 mb-6 sm:mb-8 text-center">
               <Clock className="w-16 h-16 mx-auto mb-4 text-ai-gray-700" />
-              <h3 className="text-xl font-semibold text-white mb-2">Event Not Yet Completed</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Event Not Yet Completed</h3>
               <p className="text-ai-gray-400">Reports will be available after the event date: {new Date(event!.date).toLocaleDateString()}</p>
             </div>
           ) : (
             <>
-          <div className="glass-light rounded-2xl p-6 mb-8">
-            <div className="flex flex-col lg:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <Calendar className="w-12 h-12 text-ai-white" />
-                <div>
-                  <h3 className="text-xl font-semibold text-white">{eventData.name}</h3>
-                  <p className="text-ai-gray-400">{new Date(eventData.date).toLocaleDateString()} • {eventData.duration}</p>
+          <div className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
+              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                <Calendar className="w-9 h-9 sm:w-12 sm:h-12 text-ai-white shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="text-lg sm:text-xl font-semibold text-white break-anywhere">{eventData.name}</h3>
+                  <p className="text-sm sm:text-base text-ai-gray-400">{new Date(eventData.date).toLocaleDateString()} • {eventData.duration}</p>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 text-center">
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{eventData.attendance.toLocaleString()}</div>
-                  <div className="text-sm text-ai-gray-400">Attendees</div>
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{eventData.attendance.toLocaleString()}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Attendees</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{eventData.safetyScore || '-'}</div>
-                  <div className="text-sm text-ai-gray-400">Safety Score</div>
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{eventData.safetyScore || '-'}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Safety Score</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{eventData.incidents}</div>
-                  <div className="text-sm text-ai-gray-400">Incidents</div>
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{eventData.incidents}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Incidents</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{eventData.responseTime > 0 ? `${eventData.responseTime}m` : '-'}</div>
-                  <div className="text-sm text-ai-gray-400">Avg Response</div>
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{eventData.responseTime > 0 ? `${eventData.responseTime}m` : '-'}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Avg Response</div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Report Sections */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-w-0">
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.3 }}
                 className="mb-6"
               >
-                <h2 className="text-2xl font-bold text-white mb-6">Report Sections</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {reportSections.map((section, index) => (
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Report Sections</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  {reportSections.map((section) => (
                     <div
                       key={section.id}
                       onClick={() => setSelectedReport(selectedReport === section.id ? null : section.id)}
-                      className={`glass-light rounded-2xl p-6 cursor-pointer transition-all ${
+                      className={`glass-light rounded-2xl p-4 sm:p-6 cursor-pointer transition-all ${
                         selectedReport === section.id ? 'border border-ai-white' : ''
                       }`}
                     >
-                      <div className="flex items-start gap-4">
-                        <div className="w-12 h-12 bg-ai-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                          <section.icon className="w-6 h-6 text-ai-white" />
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 bg-ai-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                          <section.icon className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white" />
                         </div>
-                        <div>
-                          <h3 className="text-lg font-semibold text-white mb-2">{section.title}</h3>
+                        <div className="min-w-0">
+                          <h3 className="text-base sm:text-lg font-semibold text-white mb-2">{section.title}</h3>
                           <p className="text-ai-gray-400 text-sm">{section.description}</p>
                         </div>
                       </div>
@@ -252,7 +252,7 @@ const PostEventReports: React.FC = () => {
 
               {/* Section Details */}
               {selectedReport && (
-                <div className="glass-light rounded-2xl p-6 mb-6">
+                <div className="glass-light rounded-2xl p-4 sm:p-6 mb-4 sm:mb-6">
                   {(() => {
                     const section = reportSections.find(s => s.id === selectedReport);
                     if (!section) return null;
@@ -261,10 +261,10 @@ const PostEventReports: React.FC = () => {
                       <div>
                         <div className="flex items-center gap-3 mb-4">
                           <section.icon className="w-6 h-6 text-ai-white" />
-                          <h3 className="text-xl font-semibold text-white">{section.title}</h3>
+                          <h3 className="text-lg sm:text-xl font-semibold text-white">{section.title}</h3>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                           {Object.entries(section.data).map(([key, value]) => (
                             <div key={key} className="bg-ai-gray-800/30 rounded-lg p-3 text-center">
                               <div className="text-lg font-bold text-ai-white">{value}</div>
@@ -296,18 +296,18 @@ const PostEventReports: React.FC = () => {
                               hoverable={true}
                             />
                             
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
                               <div className="p-3 bg-ai-white/10 border border-ai-white/30 rounded-lg">
                                 <div className="font-medium text-ai-white">Medical (3)</div>
-                                <div className="text-sm text-ai-gray-400">All resolved, no serious injuries</div>
+                                <div className="text-xs sm:text-sm text-ai-gray-400">All resolved, no serious injuries</div>
                               </div>
                               <div className="p-3 bg-ai-gray-600/10 border border-ai-gray-600/30 rounded-lg">
                                 <div className="font-medium text-ai-gray-300">Security (2)</div>
-                                <div className="text-sm text-ai-gray-400">Minor disturbances resolved</div>
+                                <div className="text-xs sm:text-sm text-ai-gray-400">Minor disturbances resolved</div>
                               </div>
                               <div className="p-3 bg-ai-gray-600/10 border border-ai-gray-600/30 rounded-lg">
                                 <div className="font-medium text-ai-gray-300">Lost & Found (2)</div>
-                                <div className="text-sm text-ai-gray-400">Items returned to owners</div>
+                                <div className="text-xs sm:text-sm text-ai-gray-400">Items returned to owners</div>
                               </div>
                             </div>
                           </div>
@@ -322,14 +322,14 @@ const PostEventReports: React.FC = () => {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Report Generation */}
-              <div className="glass-light rounded-2xl p-6">
+              <div className="glass-light rounded-2xl p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                   <Download className="w-5 h-5 text-ai-white" />
                   Generate Report
                 </h3>
                 
                 <div className="space-y-4">
-                  <div className="text-sm text-ai-gray-400">
+                  <div className="text-xs sm:text-sm text-ai-gray-400">
                     Generate a comprehensive PDF report including all sections, charts, and recommendations.
                   </div>
                   
@@ -379,7 +379,7 @@ const PostEventReports: React.FC = () => {
               </div>
 
               {/* Privacy Notice */}
-              <div className="glass-light rounded-2xl p-6">
+              <div className="glass-light rounded-2xl p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
                   <Shield className="w-5 h-5 text-ai-white" />
                   Privacy & Compliance
@@ -401,7 +401,7 @@ const PostEventReports: React.FC = () => {
               </div>
 
               {/* Quick Stats */}
-              <div className="glass-light rounded-2xl p-6">
+              <div className="glass-light rounded-2xl p-4 sm:p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Performance Highlights</h3>
                 
                 <div className="space-y-3">

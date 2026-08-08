@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAllEvents as fetchAllEvents, getEventsByOrganizer as fetchEventsByOrganizer, registerForEvent as registerForEventAPI } from '../services/event.service';
+import { getAllEvents as fetchAllEvents, registerForEvent as registerForEventAPI } from '../services/event.service';
 
-interface Camera {
+export interface Camera {
   id: string;
   name: string;
   location: string;
@@ -9,7 +9,7 @@ interface Camera {
   rtspUrl: string;
 }
 
-interface DispatchUnit {
+export interface DispatchUnit {
   id: string;
   name: string;
   type: string;
@@ -18,7 +18,9 @@ interface DispatchUnit {
   location: string;
 }
 
-interface Event {
+// Exported so pages share one definition — AdminDashboard previously kept its
+// own copy that had drifted out of sync with this one.
+export interface Event {
   id: string;
   name: string;
   type: string;

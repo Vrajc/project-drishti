@@ -8,7 +8,7 @@ const FloatingElements: React.FC = () => {
       
       {/* Large square outline */}
       <motion.div
-        className="absolute w-96 h-96 border border-ai-gray-800 rounded-lg"
+        className="absolute w-56 h-56 sm:w-80 sm:h-80 lg:w-96 lg:h-96 border border-ai-gray-800 rounded-lg"
         animate={{
           x: [0, 50, 0],
           y: [0, -30, 0],
@@ -24,7 +24,7 @@ const FloatingElements: React.FC = () => {
       
       {/* Medium circle with gradient */}
       <motion.div
-        className="absolute w-64 h-64 rounded-full"
+        className="absolute w-40 h-40 sm:w-52 sm:h-52 lg:w-64 lg:h-64 rounded-full"
         style={{
           background: 'radial-gradient(circle, rgba(255, 255, 255, 0.05) 0%, transparent 70%)',
           top: '50%',
@@ -42,9 +42,9 @@ const FloatingElements: React.FC = () => {
         }}
       />
       
-      {/* Small rotating square */}
+      {/* Small rotating square — hidden on phones, it collides with content */}
       <motion.div
-        className="absolute w-32 h-32 border border-ai-gray-700"
+        className="absolute hidden sm:block w-24 h-24 lg:w-32 lg:h-32 border border-ai-gray-700"
         animate={{
           x: [0, 40, 0],
           y: [0, -50, 0],
@@ -104,8 +104,8 @@ const FloatingElements: React.FC = () => {
       />
       
       {/* Grid overlay in corner */}
-      <div 
-        className="absolute w-48 h-48 opacity-10"
+      <div
+        className="absolute hidden sm:block w-36 h-36 lg:w-48 lg:h-48 opacity-10"
         style={{ 
           bottom: '10%', 
           right: '5%',

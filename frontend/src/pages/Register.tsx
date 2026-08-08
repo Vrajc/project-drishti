@@ -3,8 +3,6 @@ import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, User, Shield, Mail, Lock, Briefcase } from 'lucide-react';
-import GradientButton from '../components/GradientButton';
-import FloatingElements from '../components/FloatingElements';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import ParticleHero from '../components/ParticleHero';
@@ -94,7 +92,7 @@ const Register: React.FC = () => {
       {/* Interactive spotlight effects */}
       <Spotlight />
       
-      <div className="relative z-10 flex items-center justify-center min-h-screen px-4 py-12">
+      <div className="relative z-10 flex items-center justify-center min-h-screen-safe px-4 py-8 sm:py-12 safe-bottom">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -102,12 +100,12 @@ const Register: React.FC = () => {
           className="w-full max-w-md"
         >
           {/* Header */}
-          <div className="text-center mb-10">
+          <div className="text-center mb-6 sm:mb-10">
             <motion.h1
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.6 }}
-              className="text-5xl font-bold text-ai-white mb-3 tracking-tight"
+              className="text-3xl sm:text-4xl md:text-5xl font-bold text-ai-white mb-2 sm:mb-3 tracking-tight"
             >
               Create Account
             </motion.h1>
@@ -115,7 +113,7 @@ const Register: React.FC = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.3, duration: 0.6 }}
-              className="text-ai-gray-400 text-lg"
+              className="text-ai-gray-400 text-base sm:text-lg"
             >
               Join the future of event safety
             </motion.p>
@@ -126,7 +124,7 @@ const Register: React.FC = () => {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.4, duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-            className="glass-light rounded-2xl p-8 shadow-2xl border border-ai-gray-800 relative group"
+            className="glass-light rounded-2xl p-5 sm:p-8 shadow-2xl border border-ai-gray-800 relative group"
             style={{
               boxShadow: '0 0 40px rgba(255, 255, 255, 0.03), 0 0 80px rgba(255, 255, 255, 0.015)'
             }}
@@ -140,13 +138,13 @@ const Register: React.FC = () => {
               }}
             />
             
-            <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
+            <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6 relative z-10">
               {/* Role Selection */}
               <div>
-                <label className="block text-sm font-medium text-ai-gray-300 mb-4 tracking-wide">
+                <label className="block text-sm font-medium text-ai-gray-300 mb-3 sm:mb-4 tracking-wide">
                   Select Role
                 </label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
                   <motion.button
                     type="button"
                     initial={{ opacity: 0, y: 20 }}
@@ -155,7 +153,7 @@ const Register: React.FC = () => {
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => setFormData({ ...formData, role: 'participant' })}
-                    className={`p-3 rounded-xl transition-all duration-300 relative overflow-hidden ${
+                    className={`p-2.5 sm:p-3 rounded-xl transition-all duration-300 relative overflow-hidden ${
                       formData.role === 'participant'
                         ? 'bg-ai-white text-ai-black shadow-lg'
                         : 'bg-ai-gray-900/50 text-ai-gray-400 hover:bg-ai-gray-800/50 border border-ai-gray-800'
@@ -170,7 +168,7 @@ const Register: React.FC = () => {
                     )}
                     <div className="relative z-10 flex flex-col items-center">
                       <User className="w-5 h-5 mb-1" />
-                      <span className="text-xs font-medium">Participant</span>
+                      <span className="text-[11px] sm:text-xs font-medium">Participant</span>
                     </div>
                   </motion.button>
 
@@ -182,7 +180,7 @@ const Register: React.FC = () => {
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => setFormData({ ...formData, role: 'organizer' })}
-                    className={`p-3 rounded-xl transition-all duration-300 relative overflow-hidden ${
+                    className={`p-2.5 sm:p-3 rounded-xl transition-all duration-300 relative overflow-hidden ${
                       formData.role === 'organizer'
                         ? 'bg-ai-white text-ai-black shadow-lg'
                         : 'bg-ai-gray-900/50 text-ai-gray-400 hover:bg-ai-gray-800/50 border border-ai-gray-800'
@@ -197,7 +195,7 @@ const Register: React.FC = () => {
                     )}
                     <div className="relative z-10 flex flex-col items-center">
                       <Briefcase className="w-5 h-5 mb-1" />
-                      <span className="text-xs font-medium">Organizer</span>
+                      <span className="text-[11px] sm:text-xs font-medium">Organizer</span>
                     </div>
                   </motion.button>
 
@@ -209,7 +207,7 @@ const Register: React.FC = () => {
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={() => setFormData({ ...formData, role: 'admin' })}
-                    className={`p-3 rounded-xl transition-all duration-300 relative overflow-hidden ${
+                    className={`p-2.5 sm:p-3 rounded-xl transition-all duration-300 relative overflow-hidden ${
                       formData.role === 'admin'
                         ? 'bg-ai-white text-ai-black shadow-lg'
                         : 'bg-ai-gray-900/50 text-ai-gray-400 hover:bg-ai-gray-800/50 border border-ai-gray-800'
@@ -224,7 +222,7 @@ const Register: React.FC = () => {
                     )}
                     <div className="relative z-10 flex flex-col items-center">
                       <Shield className="w-5 h-5 mb-1" />
-                      <span className="text-xs font-medium">Admin</span>
+                      <span className="text-[11px] sm:text-xs font-medium">Admin</span>
                     </div>
                   </motion.button>
                 </div>
@@ -244,6 +242,8 @@ const Register: React.FC = () => {
                   <input
                     id="name"
                     type="text"
+                    autoComplete="name"
+                    autoCapitalize="words"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     className="w-full pl-12 pr-4 py-3.5 bg-ai-gray-900/50 border border-ai-gray-800 rounded-xl text-ai-white placeholder-ai-gray-500 focus:outline-none focus:ring-2 focus:ring-ai-white/20 focus:border-ai-gray-700 transition-all duration-300"
@@ -267,6 +267,11 @@ const Register: React.FC = () => {
                   <input
                     id="email"
                     type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     className="w-full pl-12 pr-4 py-3.5 bg-ai-gray-900/50 border border-ai-gray-800 rounded-xl text-ai-white placeholder-ai-gray-500 focus:outline-none focus:ring-2 focus:ring-ai-white/20 focus:border-ai-gray-700 transition-all duration-300"
@@ -290,6 +295,7 @@ const Register: React.FC = () => {
                   <input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={formData.password}
                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                     className="w-full pl-12 pr-14 py-3.5 bg-ai-gray-900/50 border border-ai-gray-800 rounded-xl text-ai-white placeholder-ai-gray-500 focus:outline-none focus:ring-2 focus:ring-ai-white/20 focus:border-ai-gray-700 transition-all duration-300"
@@ -299,7 +305,8 @@ const Register: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-ai-gray-500 hover:text-ai-white transition-colors duration-300"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-ai-gray-500 hover:text-ai-white transition-colors duration-300"
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -334,6 +341,7 @@ const Register: React.FC = () => {
                   <input
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
+                    autoComplete="new-password"
                     value={formData.confirmPassword}
                     onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                     className="w-full pl-12 pr-14 py-3.5 bg-ai-gray-900/50 border border-ai-gray-800 rounded-xl text-ai-white placeholder-ai-gray-500 focus:outline-none focus:ring-2 focus:ring-ai-white/20 focus:border-ai-gray-700 transition-all duration-300"
@@ -343,7 +351,8 @@ const Register: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-4 top-1/2 transform -translate-y-1/2 text-ai-gray-500 hover:text-ai-white transition-colors duration-300"
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 p-2 text-ai-gray-500 hover:text-ai-white transition-colors duration-300"
                   >
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>

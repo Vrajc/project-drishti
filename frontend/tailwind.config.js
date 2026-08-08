@@ -6,6 +6,26 @@ export default {
   ],
   darkMode: 'class',
   theme: {
+    // Declared in full rather than via `extend` on purpose: Tailwind emits
+    // breakpoint media queries in the order the keys appear, and `extend`
+    // appends, which would put `xs` (400px) *after* `2xl`. A later block wins
+    // at equal specificity, so `xs:` would then override `sm:`/`md:`/`lg:` on
+    // every wider screen. Listing them smallest-first keeps cascade order right.
+    screens: {
+      // Small phones (iPhone SE / Galaxy S-mini class) sit below Tailwind's
+      // default `sm`, leaving no hook to fix layouts there.
+      'xs': '400px',
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+      // Capability queries — width-independent, so they belong last where they
+      // can refine whatever the width-based rules resolved to.
+      'touch': { 'raw': '(pointer: coarse)' },
+      'can-hover': { 'raw': '(hover: hover) and (pointer: fine)' },
+      'short': { 'raw': '(max-height: 700px)' },
+    },
     extend: {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
@@ -84,16 +104,6 @@ export default {
         '26': '6.5rem',
         '30': '7.5rem',
         '34': '8.5rem',
-      },
-      borderRadius: {
-        // Refined border radius scale
-        'sm': '0.25rem',
-        'DEFAULT': '0.5rem',
-        'md': '0.625rem',
-        'lg': '0.75rem',
-        'xl': '1rem',
-        '2xl': '1.25rem',
-        '3xl': '1.5rem',
       },
       borderRadius: {
         // Refined border radius scale

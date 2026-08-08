@@ -3,9 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useEvent } from '../contexts/EventContext';
-import { Calendar, Shield, Users, Eye, Brain, FileText, AlertTriangle, Truck, Activity, TrendingUp } from 'lucide-react';
-import FloatingElements from '../components/FloatingElements';
-import FeatureCard from '../components/FeatureCard';
+import { Calendar, Shield, Users, Eye, Brain, FileText, AlertTriangle, Truck } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
@@ -174,17 +172,17 @@ const OrganizerDashboard: React.FC = () => {
       
       <Navbar />
 
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
+            className="mb-8 sm:mb-12"
           >
-            <h1 className="text-5xl font-bold mb-3 text-ai-white tracking-tight">
+            <h1 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 sm:mb-3 text-ai-white tracking-tight break-anywhere">
               Welcome back, <span className="text-ai-gray-300">{user?.name}</span>
             </h1>
-            <p className="text-ai-gray-400 text-lg">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg">
               Manage your events with AI-powered safety features
             </p>
           </motion.div>
@@ -194,7 +192,7 @@ const OrganizerDashboard: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="glass-light rounded-2xl p-8 mb-8 border border-ai-gray-800 relative group"
+              className="glass-light rounded-2xl p-5 sm:p-8 mb-6 sm:mb-8 border border-ai-gray-800 relative group"
               style={{
                 boxShadow: '0 0 40px rgba(255, 255, 255, 0.03)'
               }}
@@ -206,31 +204,34 @@ const OrganizerDashboard: React.FC = () => {
                 }}
               />
               <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-semibold text-ai-white tracking-wide">Current Event</h3>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-6">
+                  <h3 className="text-lg sm:text-xl font-semibold text-ai-white tracking-wide">Current Event</h3>
                   {getEventStatus(event.date, event.time) === 'live' && (
-                    <span className="px-4 py-2 bg-ai-white/10 text-ai-white rounded-full text-sm font-medium flex items-center gap-2 border border-ai-gray-700">
+                    <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-ai-white/10 text-ai-white rounded-full text-xs sm:text-sm font-medium flex items-center gap-2 border border-ai-gray-700 shrink-0">
                       <div className="w-2.5 h-2.5 bg-ai-white rounded-full animate-pulse" />
                       LIVE NOW
                     </span>
                   )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-ai-white mb-1">{event.name}</div>
-                    <div className="text-sm text-ai-gray-400">Event Name</div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {/* Event name and date are free-form and can be long, so they
+                      span the full row on phones and use a smaller ramp than
+                      the two numeric tiles */}
+                  <div className="text-center col-span-2 lg:col-span-1">
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-ai-white mb-1 break-anywhere">{event.name}</div>
+                    <div className="text-xs sm:text-sm text-ai-gray-400">Event Name</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-ai-white mb-1">{event.crowdSize.toLocaleString()}</div>
-                    <div className="text-sm text-ai-gray-400">Expected Attendees</div>
+                    <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-ai-white mb-1">{event.crowdSize.toLocaleString()}</div>
+                    <div className="text-xs sm:text-sm text-ai-gray-400">Expected Attendees</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-3xl font-bold text-ai-white mb-1">{event.zones.length}</div>
-                    <div className="text-sm text-ai-gray-400">Configured Zones</div>
+                    <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-ai-white mb-1">{event.zones.length}</div>
+                    <div className="text-xs sm:text-sm text-ai-gray-400">Configured Zones</div>
                   </div>
-                  <div className="text-center">
-                    <div className="text-3xl font-bold text-ai-white mb-1">{new Date(event.date).toLocaleDateString()}</div>
-                    <div className="text-sm text-ai-gray-400">Event Date</div>
+                  <div className="text-center col-span-2 lg:col-span-1">
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-ai-white mb-1">{new Date(event.date).toLocaleDateString()}</div>
+                    <div className="text-xs sm:text-sm text-ai-gray-400">Event Date</div>
                   </div>
                 </div>
               </div>
@@ -241,60 +242,60 @@ const OrganizerDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12"
+            className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-12"
           >
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Safety Score</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Safety Score</span>
                   <Shield className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">-</div>
-                <div className="text-sm text-ai-gray-500">N/A</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">-</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">N/A</div>
               </div>
             </motion.div>
 
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Active Alerts</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Active Alerts</span>
                   <AlertTriangle className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
                 <div className="flex items-center gap-2">
-                  <div className="text-3xl font-bold text-ai-white mb-1">{activeIncidents}</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{activeIncidents}</div>
                   {activeIncidents > 0 && (
                     <div className="w-2 h-2 bg-ai-white rounded-full animate-pulse" />
                   )}
                 </div>
-                <div className="text-sm text-ai-gray-500">{activeIncidents > 0 ? 'Needs attention' : 'None'}</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">{activeIncidents > 0 ? 'Needs attention' : 'None'}</div>
               </div>
             </motion.div>
 
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Response Time</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Response Time</span>
                   <Truck className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">
                   {averageResponseTime !== null 
                     ? `${Math.floor(averageResponseTime / 60)}m ${Math.round(averageResponseTime % 60)}s`
                     : '-'
                   }
                 </div>
-                <div className="text-sm text-ai-gray-500">
+                <div className="text-xs sm:text-sm text-ai-gray-500">
                   {averageResponseTime !== null ? 'Average response' : 'N/A'}
                 </div>
               </div>
@@ -302,16 +303,16 @@ const OrganizerDashboard: React.FC = () => {
 
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Total Events</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Total Events</span>
                   <Calendar className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">{organizerEvents.length}</div>
-                <div className="text-sm text-ai-gray-500">{liveEvents.length} live now</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{organizerEvents.length}</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">{liveEvents.length} live now</div>
               </div>
             </motion.div>
           </motion.div>
@@ -322,9 +323,9 @@ const OrganizerDashboard: React.FC = () => {
             transition={{ delay: 0.4 }}
             className="mb-8"
           >
-            <h2 className="text-2xl font-bold text-white mb-6">Safety Management Tools</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-4 sm:mb-6">Safety Management Tools</h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 xs:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
               {organizerFeatures.map((feature, index) => (
                 <motion.div
                   key={feature.title}
@@ -333,22 +334,23 @@ const OrganizerDashboard: React.FC = () => {
                   transition={{ delay: index * 0.1 }}
                   whileHover={feature.enabled ? { scale: 1.02, y: -4 } : {}}
                   onClick={() => feature.enabled && navigate(feature.path)}
-                  className={`glass-light rounded-2xl p-6 border border-ai-gray-800 transition-all duration-300 relative ${
+                  className={`glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 transition-all duration-300 relative ${
                     feature.enabled 
                       ? 'cursor-pointer hover:glass-medium' 
                       : 'opacity-50 cursor-not-allowed'
                   }`}
                 >
                   {feature.badge && (
-                    <div className="absolute top-4 right-4">
+                    <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
                       <span className="px-2 py-1 bg-ai-white/10 text-ai-white rounded-full text-xs font-medium flex items-center gap-1.5 border border-ai-gray-700">
                         <div className="w-1.5 h-1.5 bg-ai-white rounded-full animate-pulse" />
                         {feature.badge}
                       </span>
                     </div>
                   )}
-                  <feature.icon className={`w-8 h-8 mb-4 ${feature.enabled ? 'text-ai-white' : 'text-ai-gray-600'}`} />
-                  <h3 className={`text-lg font-semibold mb-2 ${feature.enabled ? 'text-ai-white' : 'text-ai-gray-500'}`}>
+                  <feature.icon className={`w-7 h-7 sm:w-8 sm:h-8 mb-3 sm:mb-4 ${feature.enabled ? 'text-ai-white' : 'text-ai-gray-600'}`} />
+                  {/* pr-16 keeps the title clear of the absolutely-placed badge */}
+                  <h3 className={`text-base sm:text-lg font-semibold mb-2 pr-16 ${feature.enabled ? 'text-ai-white' : 'text-ai-gray-500'}`}>
                     {feature.title}
                   </h3>
                   <p className="text-sm text-ai-gray-400">
@@ -368,38 +370,38 @@ const OrganizerDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
-            className="glass-light rounded-2xl p-8 border border-ai-gray-800"
+            className="glass-light rounded-2xl p-5 sm:p-8 border border-ai-gray-800"
           >
-            <h3 className="text-xl font-semibold text-ai-white mb-6 tracking-wide">Quick Actions</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <h3 className="text-lg sm:text-xl font-semibold text-ai-white mb-4 sm:mb-6 tracking-wide">Quick Actions</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
               <motion.button
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/live-monitoring')}
-                className="p-6 bg-ai-gray-900/50 hover:bg-ai-gray-800/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-xl transition-all group"
+                className="p-4 sm:p-6 bg-ai-gray-900/50 hover:bg-ai-gray-800/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-xl transition-all group"
               >
-                <Eye className="w-7 h-7 mx-auto mb-3 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
-                <div className="font-semibold text-ai-white group-hover:text-ai-gray-200">View Live Dashboard</div>
+                <Eye className="w-6 h-6 sm:w-7 sm:h-7 mx-auto mb-2 sm:mb-3 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
+                <div className="text-sm sm:text-base font-semibold text-ai-white group-hover:text-ai-gray-200">View Live Dashboard</div>
               </motion.button>
 
               <motion.button
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/pre-safety-planning')}
-                className="p-6 bg-ai-gray-900/50 hover:bg-ai-gray-800/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-xl transition-all group"
+                className="p-4 sm:p-6 bg-ai-gray-900/50 hover:bg-ai-gray-800/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-xl transition-all group"
               >
-                <Shield className="w-7 h-7 mx-auto mb-3 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
-                <div className="font-semibold text-ai-white group-hover:text-ai-gray-200">AI Safety Planning</div>
+                <Shield className="w-6 h-6 sm:w-7 sm:h-7 mx-auto mb-2 sm:mb-3 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
+                <div className="text-sm sm:text-base font-semibold text-ai-white group-hover:text-ai-gray-200">AI Safety Planning</div>
               </motion.button>
 
               <motion.button
                 whileHover={{ scale: 1.02, y: -2 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={() => navigate('/event-setup')}
-                className="p-6 bg-ai-gray-900/50 hover:bg-ai-gray-800/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-xl transition-all group"
+                className="p-4 sm:p-6 bg-ai-gray-900/50 hover:bg-ai-gray-800/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-xl transition-all group"
               >
-                <Calendar className="w-7 h-7 mx-auto mb-3 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
-                <div className="font-semibold text-ai-white group-hover:text-ai-gray-200">Setup New Event</div>
+                <Calendar className="w-6 h-6 sm:w-7 sm:h-7 mx-auto mb-2 sm:mb-3 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
+                <div className="text-sm sm:text-base font-semibold text-ai-white group-hover:text-ai-gray-200">Setup New Event</div>
               </motion.button>
             </div>
           </motion.div>

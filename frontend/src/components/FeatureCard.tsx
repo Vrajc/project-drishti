@@ -33,7 +33,7 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
       transition={{ duration: 0.4, delay, ease: [0.4, 0, 0.2, 1] }}
       viewport={{ once: true }}
       onClick={onClick}
-      className={`group relative glassmorphism rounded-xl p-8 
+      className={`group relative glassmorphism rounded-xl p-5 sm:p-6 lg:p-8 h-full
         border border-ai-gray-700 hover:border-ai-gray-500
         transition-all duration-300 ai-card ${onClick ? 'cursor-pointer' : ''}`}
     >
@@ -52,22 +52,22 @@ const FeatureCard: React.FC<FeatureCardProps> = ({
               damping: 17
             }
           }}
-          className="w-14 h-14 bg-ai-white rounded-lg flex items-center justify-center mb-6 
+          className="w-12 h-12 sm:w-14 sm:h-14 bg-ai-white rounded-lg flex items-center justify-center mb-4 sm:mb-6
             transition-all duration-300"
         >
-          <Icon className="w-7 h-7 text-ai-black" strokeWidth={1.5} />
+          <Icon className="w-6 h-6 sm:w-7 sm:h-7 text-ai-black" strokeWidth={1.5} />
         </motion.div>
-        
-        <h3 className="text-xl font-semibold text-ai-white mb-3 tracking-tight">
+
+        <h3 className="text-lg sm:text-xl font-semibold text-ai-white mb-2 sm:mb-3 tracking-tight">
           {title}
         </h3>
-        
+
         <p className="text-ai-gray-300 leading-relaxed text-sm">
           {description}
         </p>
 
         {/* Minimal bottom indicator */}
-        <div className="mt-6 w-8 h-0.5 bg-ai-white opacity-0 group-hover:opacity-100 group-hover:w-12 transition-all duration-300" />
+        <div className="mt-4 sm:mt-6 w-8 h-0.5 bg-ai-white opacity-0 group-hover:opacity-100 group-hover:w-12 transition-all duration-300" />
       </div>
     </motion.div>
   );

@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, AlertTriangle, Users, Shield, Camera, Upload, MessageSquare, Activity } from 'lucide-react';
+import { Eye, AlertTriangle, Users, Shield, Camera, MessageSquare, Activity } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useEvent } from '../contexts/EventContext';
 import { useNavigate } from 'react-router-dom';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
-import { analyzeMonitoring } from '../services/ai.service';
 import { incidentService, Incident as IncidentType } from '../services/incident.service';
 import crowdAnalysisService from '../services/crowdAnalysis.service';
 
@@ -31,8 +30,15 @@ const LiveMonitoring: React.FC = () => {
   const navigate = useNavigate();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [showReportForm, setShowReportForm] = useState(false);
-  const [newIncident, setNewIncident] = useState({
-    type: 'general' as const,
+  // `'general' as const` pinned the field to that one literal, so the
+  // "Lost & Found" quick action could never change it and the photo-upload
+  // field it gates was unreachable. Widened to the real union.
+  const [newIncident, setNewIncident] = useState<{
+    type: IncidentType['type'];
+    description: string;
+    location: string;
+  }>({
+    type: 'general',
     description: '',
     location: ''
   });
@@ -63,6 +69,26 @@ const LiveMonitoring: React.FC = () => {
   
   // Find live event
   const liveEvent = userEvents.find(event => isEventLive(event.date, event.time));
+
+  // `mapFile` is `File | string | null` — a freshly-picked File needs an
+  // object URL before it can be used as an <img src>, and that URL has to be
+  // revoked or it leaks for the lifetime of the document.
+  const rawMapFile = liveEvent?.mapFile ?? null;
+  const [mapFileSrc, setMapFileSrc] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!rawMapFile) {
+      setMapFileSrc(undefined);
+      return;
+    }
+    if (typeof rawMapFile === 'string') {
+      setMapFileSrc(rawMapFile);
+      return;
+    }
+    const objectUrl = URL.createObjectURL(rawMapFile);
+    setMapFileSrc(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [rawMapFile]);
 
   // Debug logging
   useEffect(() => {
@@ -167,9 +193,12 @@ const LiveMonitoring: React.FC = () => {
 
     const fetchCrowdDensity = async () => {
       try {
-        const data = await crowdAnalysisService.getLatestDensityByZone(liveEvent.id);
+        // Was `getLatestDensityByZone`, which does not exist on the service —
+        // the call threw every time and the catch below swallowed it, so the
+        // live crowd density panel never populated.
+        const data = await crowdAnalysisService.getLatestDensity(liveEvent.id);
         setCrowdDensity(data);
-        
+
         // Calculate average density
         if (data.length > 0) {
           const avg = data.reduce((sum, zone) => sum + zone.densityPercentage, 0) / data.length;
@@ -276,28 +305,28 @@ const LiveMonitoring: React.FC = () => {
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <Eye className="w-16 h-16 mx-auto mb-4 text-ai-white" />
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <Eye className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               Live Safety Dashboard
             </h1>
-            <p className="text-ai-gray-400 text-lg max-w-2xl mx-auto mb-2">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto mb-2">
               {user?.role === 'organizer'
                 ? 'Comprehensive event safety oversight and incident management'
                 : 'Report incidents and view live safety status'
               }
             </p>
             {liveEvent && (
-              <div className="inline-flex items-center gap-2 px-4 py-2 glass-light rounded-full mt-2">
-                <div className="w-2 h-2 bg-ai-white rounded-full animate-pulse" />
-                <span className="text-ai-white font-medium">{stats.eventName}</span>
+              <div className="inline-flex max-w-full items-center gap-2 px-4 py-2 glass-light rounded-full mt-2">
+                <div className="w-2 h-2 shrink-0 bg-ai-white rounded-full animate-pulse" />
+                <span className="text-sm sm:text-base text-ai-white font-medium truncate">{stats.eventName}</span>
               </div>
             )}
           </motion.div>
@@ -308,9 +337,9 @@ const LiveMonitoring: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
-              className="glass-light rounded-2xl p-12 mb-8 text-center"
+              className="glass-light rounded-2xl p-6 sm:p-12 mb-6 sm:mb-8 text-center"
             >
-              <h3 className="text-2xl font-semibold text-ai-white mb-2">No Live Event</h3>
+              <h3 className="text-xl sm:text-2xl font-semibold text-ai-white mb-2">No Live Event</h3>
               <p className="text-ai-gray-400 mb-6 max-w-md mx-auto">
                 You don't have any events happening right now. Register for an event to access live monitoring features.
               </p>
@@ -343,34 +372,34 @@ const LiveMonitoring: React.FC = () => {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2 }}
-                className="glass-light rounded-2xl p-6 mb-8"
+                className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"
               >
-                <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <Shield className="w-12 h-12 text-ai-white" />
-                    <div>
-                      <h3 className="text-xl font-semibold text-white">Event Safety Status</h3>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getSafetyStatusColor(stats.safetyStatus)}`}>
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="flex items-start sm:items-center gap-3 sm:gap-4 min-w-0">
+                    <Shield className="w-9 h-9 sm:w-12 sm:h-12 shrink-0 text-ai-white" />
+                    <div className="min-w-0">
+                      <h3 className="text-lg sm:text-xl font-semibold text-white">Event Safety Status</h3>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1">
+                        <span className={`px-3 py-1 rounded-full text-xs sm:text-sm font-medium ${getSafetyStatusColor(stats.safetyStatus)}`}>
                           {stats.safetyStatus}
                         </span>
-                        <span className="text-gray-400">Last updated: {new Date().toLocaleTimeString()}</span>
+                        <span className="text-xs sm:text-sm text-gray-400">Last updated: {new Date().toLocaleTimeString()}</span>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-6 text-center">
+                  <div className="grid grid-cols-3 md:flex md:items-center gap-3 sm:gap-6 text-center shrink-0 border-t md:border-t-0 border-ai-gray-800 pt-4 md:pt-0">
                     <div>
-                      <div className="text-2xl font-bold text-ai-white">{stats.crowdLevel}%</div>
-                      <div className="text-sm text-ai-gray-400">Crowd Level</div>
+                      <div className="text-xl sm:text-2xl font-bold text-ai-white">{stats.crowdLevel}%</div>
+                      <div className="text-xs sm:text-sm text-ai-gray-400">Crowd Level</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-ai-white">{stats.emergencyUnits}</div>
-                      <div className="text-sm text-ai-gray-400">Units Ready</div>
+                      <div className="text-xl sm:text-2xl font-bold text-ai-white">{stats.emergencyUnits}</div>
+                      <div className="text-xs sm:text-sm text-ai-gray-400">Units Ready</div>
                     </div>
                     <div>
-                      <div className="text-2xl font-bold text-ai-white">{stats.responseTime}m</div>
-                      <div className="text-sm text-gray-400">Avg Response</div>
+                      <div className="text-xl sm:text-2xl font-bold text-ai-white">{stats.responseTime}m</div>
+                      <div className="text-xs sm:text-sm text-gray-400">Avg Response</div>
                     </div>
                   </div>
                 </div>
@@ -382,10 +411,10 @@ const LiveMonitoring: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="glass-light rounded-2xl p-12 mb-8 text-center"
+                  className="glass-light rounded-2xl p-6 sm:p-12 mb-6 sm:mb-8 text-center"
                 >
-                  <Eye className="w-16 h-16 mx-auto mb-4 text-ai-gray-500" />
-                  <h3 className="text-2xl font-semibold text-ai-white mb-2">No Live Event</h3>
+                  <Eye className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-4 text-ai-gray-500" />
+                  <h3 className="text-xl sm:text-2xl font-semibold text-ai-white mb-2">No Live Event</h3>
                   <p className="text-ai-gray-400 mb-6 max-w-md mx-auto">
                     You don't have any events happening right now. Create or register for an event to access live monitoring features.
                   </p>
@@ -421,29 +450,29 @@ const LiveMonitoring: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+                  className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8"
                 >
-                  <div className="glass-light rounded-2xl p-6 text-center">
+                  <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
                     <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-                    <div className="text-2xl font-bold text-white">{stats.activeIncidents}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-white">{stats.activeIncidents}</div>
                     <div className="text-sm text-ai-gray-400">Active Incidents</div>
                   </div>
                   
-                  <div className="glass-light rounded-2xl p-6 text-center">
+                  <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
                     <Camera className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-                    <div className="text-2xl font-bold text-white">{stats.cameras}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-white">{stats.cameras}</div>
                     <div className="text-sm text-ai-gray-400">Cameras Online</div>
                   </div>
                   
-                  <div className="glass-light rounded-2xl p-6 text-center">
+                  <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
                     <Users className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-                    <div className="text-2xl font-bold text-white">{stats.zones}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-white">{stats.zones}</div>
                     <div className="text-sm text-ai-gray-400">Zones Monitored</div>
                   </div>
                   
-                  <div className="glass-light rounded-2xl p-6 text-center">
+                  <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
                     <Shield className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-                    <div className="text-2xl font-bold text-white">{stats.safetyScore}</div>
+                    <div className="text-xl sm:text-2xl font-bold text-white">{stats.safetyScore}</div>
                     <div className="text-sm text-gray-400">Safety Score</div>
                   </div>
                 </motion.div>
@@ -455,24 +484,24 @@ const LiveMonitoring: React.FC = () => {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.35 }}
-                  className="glass-light rounded-2xl p-6 mb-8"
+                  className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"
                 >
-                  <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                      <Activity className="w-6 h-6 text-ai-white" />
-                      <h3 className="text-xl font-semibold text-white">Live Crowd Density</h3>
+                  <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white shrink-0" />
+                      <h3 className="text-lg sm:text-xl font-semibold text-white">Live Crowd Density</h3>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="text-3xl font-bold text-ai-white">{stats.crowdDensity}%</div>
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-2xl sm:text-3xl font-bold text-ai-white">{stats.crowdDensity}%</div>
                       <span className="text-sm text-ai-gray-400">Average</span>
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                     {crowdDensity.map((zone) => (
                       <div key={zone.zoneId} className="glass-medium rounded-xl p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-sm font-medium text-ai-white">{zone.zoneName}</span>
+                        <div className="flex items-center justify-between gap-2 mb-3">
+                          <span className="text-sm font-medium text-ai-white truncate">{zone.zoneName}</span>
                           <span className={`text-lg font-bold ${
                             zone.densityPercentage >= 80 ? 'text-red-400' :
                             zone.densityPercentage >= 60 ? 'text-yellow-400' :
@@ -500,7 +529,7 @@ const LiveMonitoring: React.FC = () => {
                     ))}
                   </div>
                   
-                  <div className="mt-4 flex items-center justify-between text-xs text-ai-gray-500">
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs text-ai-gray-500">
                     <span>Last updated: {crowdDensity[0] ? new Date(crowdDensity[0].timestamp).toLocaleTimeString() : 'N/A'}</span>
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-ai-white rounded-full animate-pulse" />
@@ -510,19 +539,19 @@ const LiveMonitoring: React.FC = () => {
                 </motion.div>
               )}
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
                 {/* Main Content */}
-                <div className="lg:col-span-2 space-y-8">
+                <div className="lg:col-span-2 space-y-6 lg:space-y-8 min-w-0">
                   {/* Incident Reports */}
                   <motion.div
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 }}
-                    className="glass-light rounded-2xl p-6"
+                    className="glass-light rounded-2xl p-4 sm:p-6"
                   >
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-xl font-semibold text-white flex items-center gap-2">
-                        <MessageSquare className="w-6 h-6 text-ai-white" />
+                    <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
+                      <h3 className="text-lg sm:text-xl font-semibold text-white flex items-center gap-2">
+                        <MessageSquare className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white shrink-0" />
                         Recent Incidents
                       </h3>
                       {user?.role === 'participant' && (
@@ -530,7 +559,7 @@ const LiveMonitoring: React.FC = () => {
                           whileHover={{ scale: 1.05 }}
                           whileTap={{ scale: 0.95 }}
                           onClick={() => setShowReportForm(true)}
-                          className="px-4 py-2 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors"
+                          className="px-4 py-2 bg-ai-white text-ai-black rounded-xl text-sm sm:text-base whitespace-nowrap hover:bg-ai-gray-300 transition-colors"
                         >
                           Report Incident
                         </motion.button>
@@ -547,24 +576,26 @@ const LiveMonitoring: React.FC = () => {
                           className="bg-ai-gray-800/30 rounded-xl p-4 border border-ai-gray-800"
                         >
                           <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-3 flex-1">
-                              <div className={`w-10 h-10 ${incidentTypes[incident.type].color} rounded-lg flex items-center justify-center text-lg`}>
+                            <div className="flex items-start gap-3 flex-1 min-w-0">
+                              <div className={`w-9 h-9 sm:w-10 sm:h-10 shrink-0 ${incidentTypes[incident.type].color} rounded-lg flex items-center justify-center text-lg`}>
                                 {incidentTypes[incident.type].icon}
                               </div>
                               
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
                                   <h4 className="font-semibold text-white">{incidentTypes[incident.type].label}</h4>
                                   <span className={`px-2 py-0.5 rounded-full text-xs ${getStatusColor(incident.status)}`}>
                                     {incident.status}
                                   </span>
                                 </div>
                                 
-                                <p className="text-ai-gray-400 mb-2">{incident.description}</p>
+                                <p className="text-sm sm:text-base text-ai-gray-400 mb-2 break-anywhere">{incident.description}</p>
                                 
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-ai-white">📍 {incident.location}</span>
-                                  <span className="text-ai-gray-500">
+                                {/* Reporter/timestamp drops below the location
+                                    instead of colliding with it on a phone */}
+                                <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-1 text-xs sm:text-sm">
+                                  <span className="text-ai-white break-anywhere">📍 {incident.location}</span>
+                                  <span className="text-ai-gray-500 break-anywhere">
                                     {incident.timestamp.toLocaleTimeString()} by {incident.reporter}
                                   </span>
                                 </div>
@@ -620,17 +651,17 @@ const LiveMonitoring: React.FC = () => {
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 }}
-                    className="glass-light rounded-2xl p-6"
+                    className="glass-light rounded-2xl p-4 sm:p-6"
                   >
-                    <h3 className="text-xl font-semibold text-white mb-4">
+                    <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">
                       {user?.role === 'organizer' ? 'Live Event Map' : 'Event Venue Map'}
                     </h3>
                     <div className="aspect-video bg-ai-gray-800/50 rounded-xl relative overflow-hidden">
                       {/* Event Map Image */}
-                      {liveEvent.mapFile ? (
-                        <img 
-                          src={liveEvent.mapFile} 
-                          alt="Event venue map" 
+                      {mapFileSrc ? (
+                        <img
+                          src={mapFileSrc}
+                          alt="Event venue map"
                           className="absolute inset-0 w-full h-full object-contain"
                         />
                       ) : (
@@ -661,11 +692,11 @@ const LiveMonitoring: React.FC = () => {
                         liveEvent.zones.slice(0, 4).map((zone, i) => (
                           <div 
                             key={zone}
-                            className={`absolute text-white text-sm font-medium px-2 py-1 bg-black/40 backdrop-blur-sm rounded ${
-                              i === 0 ? 'top-4 left-4' :
-                              i === 1 ? 'top-4 right-4' :
-                              i === 2 ? 'bottom-4 left-4' :
-                              'bottom-4 right-4'
+                            className={`absolute max-w-[40%] truncate text-white text-[11px] sm:text-sm font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 bg-black/40 backdrop-blur-sm rounded ${
+                              i === 0 ? 'top-2 left-2 sm:top-4 sm:left-4' :
+                              i === 1 ? 'top-2 right-2 sm:top-4 sm:right-4' :
+                              i === 2 ? 'bottom-2 left-2 sm:bottom-4 sm:left-4' :
+                              'bottom-2 right-2 sm:bottom-4 sm:right-4'
                             }`}
                           >
                             {zone}
@@ -693,13 +724,13 @@ const LiveMonitoring: React.FC = () => {
                 </div>
 
                 {/* Sidebar */}
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6 min-w-0">
                   {/* Quick Actions */}
                   <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.4 }}
-                    className="glass-light rounded-2xl p-6"
+                    className="glass-light rounded-2xl p-4 sm:p-6"
                   >
                     <h3 className="text-lg font-semibold text-white mb-4">Quick Actions</h3>
                     
@@ -752,19 +783,19 @@ const LiveMonitoring: React.FC = () => {
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.5 }}
-                    className="glass-light rounded-2xl p-6"
+                    className="glass-light rounded-2xl p-4 sm:p-6"
                   >
                     <h3 className="text-lg font-semibold text-white mb-4">Zone Status</h3>
                     
                     <div className="space-y-3">
-                      {zones.slice(0, 5).map((zone, index) => {
+                      {zones.slice(0, 5).map((zone) => {
                         const status = Math.random() > 0.7 ? 'caution' : 'normal';
                         const crowdLevel = Math.floor(Math.random() * 40) + 30;
                         
                         return (
-                          <div key={zone} className="flex items-center justify-between">
-                            <span className="text-ai-gray-300 text-sm">{zone}</span>
-                            <div className="flex items-center gap-2">
+                          <div key={zone} className="flex items-center justify-between gap-2">
+                            <span className="text-ai-gray-300 text-sm truncate">{zone}</span>
+                            <div className="flex items-center gap-2 shrink-0">
                               <span className="text-xs text-ai-gray-400">{crowdLevel}%</span>
                               <div className={`w-2 h-2 rounded-full ${
                                 status === 'normal' ? 'bg-ai-white' : 'bg-ai-gray-400'
@@ -791,10 +822,10 @@ const LiveMonitoring: React.FC = () => {
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="glass-light rounded-2xl p-6 w-full max-w-md"
+                className="glass-light rounded-2xl p-4 sm:p-6 w-full max-w-md max-h-[85dvh] overflow-y-auto overscroll-contain"
                 onClick={(e) => e.stopPropagation()}
               >
-                <h3 className="text-xl font-semibold text-white mb-4">Report Incident</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Report Incident</h3>
                 
                 <div className="space-y-4">
                   <div>
@@ -853,7 +884,7 @@ const LiveMonitoring: React.FC = () => {
                         className="w-full px-3 py-2 bg-ai-gray-800/50 border border-ai-gray-800 rounded-lg text-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-ai-white file:text-ai-black hover:file:bg-ai-gray-300"
                       />
                       {lostFoundImage && (
-                        <p className="text-sm text-ai-gray-400 mt-1">Selected: {lostFoundImage.name}</p>
+                        <p className="text-sm text-ai-gray-400 mt-1 break-anywhere">Selected: {lostFoundImage.name}</p>
                       )}
                     </div>
                   )}

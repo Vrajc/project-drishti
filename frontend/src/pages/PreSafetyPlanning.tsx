@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, MapPin, Camera, Heart, Users, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Shield, MapPin, Camera, Heart, Users, CheckCircle } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
@@ -19,13 +19,17 @@ const PreSafetyPlanning: React.FC = () => {
     setIsAnalyzing(true);
     
     try {
+      // These read `event.expectedAttendance` / `.venue` / `.duration`, none of
+      // which exist on Event — so every analysis silently ran on the hardcoded
+      // fallbacks instead of the real event. Mapped to the actual fields.
+      // Event carries no duration, so that default genuinely stands.
       const result = await analyzeSafetyPlanning({
         name: event.name,
         type: event.type || 'General Event',
-        expectedAttendance: event.expectedAttendance || 1000,
-        venue: event.venue || 'Event Venue',
-        duration: event.duration || 'Full Day',
-        zones: event.zones || ['Main Area', 'Food Court', 'VIP Section']
+        expectedAttendance: event.crowdSize || 1000,
+        venue: event.location || 'Event Venue',
+        duration: 'Full Day',
+        zones: event.zones?.length ? event.zones : ['Main Area', 'Food Court', 'VIP Section']
       });
 
       if (result.success && result.analysis) {
@@ -73,19 +77,19 @@ const PreSafetyPlanning: React.FC = () => {
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <Shield className="w-16 h-16 mx-auto mb-4 text-ai-white" />
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <Shield className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               AI Pre-Safety Planning
             </h1>
-            <p className="text-ai-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto">
               Intelligent placement of safety infrastructure using AI analysis of your event layout and expected crowd patterns
             </p>
           </motion.div>
@@ -96,40 +100,40 @@ const PreSafetyPlanning: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="glass-light rounded-2xl p-6 mb-8"
+              className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"
             >
-              <h3 className="text-xl font-semibold text-white mb-4">Current Event Analysis</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-4">Current Event Analysis</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 text-center">
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{event.name}</div>
-                  <div className="text-sm text-ai-gray-400">Event Name</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-ai-white break-anywhere">{event.name}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Event Name</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{event.crowdSize.toLocaleString()}</div>
-                  <div className="text-sm text-ai-gray-400">Expected Attendees</div>
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{event.crowdSize.toLocaleString()}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Expected Attendees</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{event.zones.length}</div>
-                  <div className="text-sm text-ai-gray-400">Configured Zones</div>
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{event.zones.length}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Configured Zones</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-ai-white">{event.type}</div>
-                  <div className="text-sm text-ai-gray-400">Event Type</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-ai-white break-anywhere">{event.type}</div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Event Type</div>
                 </div>
               </div>
             </motion.div>
           )}
 
           {/* Analysis Section */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Control Panel */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.3 }}
-              className="glass-light rounded-2xl p-6"
+              className="glass-light rounded-2xl p-4 sm:p-6"
             >
-              <h3 className="text-xl font-semibold text-white mb-6">AI Analysis Control</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6">AI Analysis Control</h3>
               
               {!analysisComplete && !isAnalyzing && (
                 <div>
@@ -190,7 +194,7 @@ const PreSafetyPlanning: React.FC = () => {
 
               {analysisComplete && (
                 <div className="text-center">
-                  <CheckCircle className="w-16 h-16 mx-auto mb-4 text-ai-white" />
+                  <CheckCircle className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
                   <h4 className="text-lg font-semibold text-white mb-2">Analysis Complete</h4>
                   <p className="text-ai-gray-400 mb-4">AI has generated optimized safety recommendations for your event.</p>
                   <motion.button
@@ -213,9 +217,9 @@ const PreSafetyPlanning: React.FC = () => {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.4 }}
-              className="glass-light rounded-2xl p-6"
+              className="glass-light rounded-2xl p-4 sm:p-6"
             >
-              <h3 className="text-xl font-semibold text-white mb-6">Venue Visualization</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6">Venue Visualization</h3>
               <div className="aspect-square bg-ai-gray-800/50 rounded-xl relative overflow-hidden">
                 {/* Display uploaded venue image if available */}
                 {event?.mapFile && (
@@ -301,7 +305,7 @@ const PreSafetyPlanning: React.FC = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="glass-light rounded-2xl p-6"
+                    className="glass-light rounded-2xl p-4 sm:p-6"
                   >
                     <div className="flex items-center gap-4 mb-4">
                       <div className={`w-12 h-12 bg-ai-white/20 rounded-xl flex items-center justify-center`}>

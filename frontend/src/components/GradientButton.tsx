@@ -51,10 +51,11 @@ const GradientButton: React.FC<GradientButtonProps> = ({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`px-6 py-3 rounded-lg font-medium transition-all duration-300 
+      className={`px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg font-medium text-sm sm:text-base
+        transition-all duration-300 whitespace-nowrap
         disabled:opacity-40 disabled:cursor-not-allowed
         shadow-lg hover:shadow-2xl
-        ${getVariantStyles()} 
+        ${getVariantStyles()}
         ${className}`}
     >
       {children}

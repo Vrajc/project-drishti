@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Truck, Clock, Route, Phone, CheckCircle, Navigation } from 'lucide-react';
+import { MapPin, Truck, Clock, Route, Phone, Navigation } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 import { useAuth } from '../contexts/AuthContext';
 import MeshGradient from '../components/MeshGradient';
@@ -50,8 +50,8 @@ const EmergencyDispatch: React.FC = () => {
   const [emergencies, setEmergencies] = useState<Emergency[]>([]);
   const [responders, setResponders] = useState<ResponderUnit[]>([]);
   const [isActive, setIsActive] = useState(false);
-  const [selectedEmergency, setSelectedEmergency] = useState<Emergency | null>(null);
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [, setSelectedEmergency] = useState<Emergency | null>(null);
+  const [, setIncidents] = useState<Incident[]>([]);
 
   // Helper function to check if event is live
   const isEventLive = (date: string, time: string): boolean => {
@@ -173,28 +173,6 @@ const EmergencyDispatch: React.FC = () => {
     medium: 'border-ai-gray-600 bg-ai-gray-600/10',
     high: 'border-ai-white bg-ai-white/10',
     critical: 'border-ai-white bg-ai-white/10'
-  };
-
-  const generateMockEmergency = (): Emergency => {
-    const types = ['medical', 'fire', 'security', 'evacuation'] as const;
-    const priorities = ['low', 'medium', 'high', 'critical'] as const;
-    const locations = ['Main Stage Area', 'Food Court', 'VIP Section', 'Parking Lot A', 'Emergency Exit 2', 'Restroom Block C'];
-    
-    const type = types[Math.floor(Math.random() * types.length)];
-    const priority = priorities[Math.floor(Math.random() * priorities.length)];
-    
-    return {
-      id: Math.random().toString(36).substr(2, 9),
-      type,
-      priority,
-      location: locations[Math.floor(Math.random() * locations.length)],
-      coordinates: {
-        lat: 40.7128 + (Math.random() - 0.5) * 0.01,
-        lng: -74.0060 + (Math.random() - 0.5) * 0.01
-      },
-      timestamp: new Date(),
-      status: 'pending'
-    };
   };
 
   const generateMockResponders = (): ResponderUnit[] => {
@@ -342,56 +320,56 @@ const EmergencyDispatch: React.FC = () => {
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <Truck className="w-16 h-16 mx-auto mb-4 text-ai-white" />
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <Truck className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               Emergency Dispatch
             </h1>
-            <p className="text-ai-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto">
               Automated emergency response system with optimal routing and real-time coordination
             </p>
           </motion.div>
 
           {/* Stats Dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="glass-light rounded-2xl p-6 text-center">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <Phone className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">{pendingEmergencies.length}</div>
-              <div className="text-sm text-ai-gray-400">Pending</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{pendingEmergencies.length}</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Pending</div>
             </div>
             
-            <div className="glass-light rounded-2xl p-6 text-center">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <Route className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">{activeDispatches.length}</div>
-              <div className="text-sm text-ai-gray-400">Active Dispatches</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{activeDispatches.length}</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Active Dispatches</div>
             </div>
             
-            <div className="glass-light rounded-2xl p-6 text-center">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <Truck className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">{availableUnits.length}</div>
-              <div className="text-sm text-ai-gray-400">Available Units</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">{availableUnits.length}</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Available Units</div>
             </div>
             
-            <div className="glass-light rounded-2xl p-6 text-center">
+            <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <Clock className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-              <div className="text-2xl font-bold text-white">-</div>
-              <div className="text-sm text-ai-gray-400">Avg Response</div>
+              <div className="text-xl sm:text-2xl font-bold text-white">-</div>
+              <div className="text-xs sm:text-sm text-ai-gray-400">Avg Response</div>
             </div>
           </div>
 
           {/* Control Panel */}
-          <div className="glass-light rounded-2xl p-6 mb-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-semibold text-white mb-2">Dispatch Control Center</h3>
-                <p className="text-ai-gray-400">AI-powered emergency response coordination system</p>
+          <div className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Dispatch Control Center</h3>
+                <p className="text-sm sm:text-base text-ai-gray-400">AI-powered emergency response coordination system</p>
                 {!event && (
                   <p className="text-sm text-yellow-400 mt-2">⚠️ No event selected. Please setup or select an event first.</p>
                 )}
@@ -399,8 +377,8 @@ const EmergencyDispatch: React.FC = () => {
                   <p className="text-sm text-yellow-400 mt-2">⚠️ No dispatch units configured in Event Setup. Add units in Event Setup page.</p>
                 )}
               </div>
-              <div className="flex items-center gap-4">
-                <div className={`px-3 py-1 rounded-full text-sm ${
+              <div className="flex items-center gap-3 sm:gap-4 shrink-0">
+                <div className={`px-3 py-1 rounded-full text-xs sm:text-sm whitespace-nowrap ${
                   isActive ? 'bg-ai-white/20 text-ai-white' : 'bg-ai-gray-500/20 text-ai-gray-400'
                 }`}>
                   {isActive ? '● Active' : '○ Standby'}
@@ -409,7 +387,7 @@ const EmergencyDispatch: React.FC = () => {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={toggleSystem}
-                  className="px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors"
+                  className="flex-1 md:flex-none px-4 sm:px-6 py-3 bg-ai-white text-ai-black rounded-xl text-sm sm:text-base whitespace-nowrap hover:bg-ai-gray-300 transition-colors"
                 >
                   {isActive ? 'Deactivate System' : 'Activate System'}
                 </motion.button>
@@ -417,11 +395,11 @@ const EmergencyDispatch: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8">
             {/* Emergency Queue */}
-            <div className="glass-light rounded-2xl p-6">
-              <h3 className="text-xl font-semibold text-white mb-6 flex items-center gap-2">
-                <Phone className="w-6 h-6 text-ai-white" />
+            <div className="glass-light rounded-2xl p-4 sm:p-6 min-w-0">
+              <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 sm:mb-6 flex flex-wrap items-center gap-2">
+                <Phone className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white shrink-0" />
                 Emergency Queue
                 {pendingEmergencies.length > 0 && (
                   <span className="bg-ai-white/20 text-ai-white px-2 py-1 rounded-full text-sm">
@@ -446,14 +424,14 @@ const EmergencyDispatch: React.FC = () => {
                       }`}
                       onClick={() => setSelectedEmergency(emergency)}
                     >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 ${emergencyColor} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-3 min-w-0">
+                          <div className={`w-9 h-9 sm:w-10 sm:h-10 ${emergencyColor} rounded-lg flex items-center justify-center flex-shrink-0`}>
                             <EmergencyIcon className="w-5 h-5 text-white" />
                           </div>
                           
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-1">
                               <h4 className="font-semibold text-white">{emergencyTypes[emergency.type].label}</h4>
                               <span className={`px-2 py-0.5 rounded-full text-xs ${
                                 emergency.priority === 'critical' ? 'bg-ai-white/20 text-ai-white' :
@@ -465,9 +443,9 @@ const EmergencyDispatch: React.FC = () => {
                               </span>
                             </div>
                             
-                            <p className="text-ai-gray-400 text-sm mb-2">📍 {emergency.location}</p>
+                            <p className="text-ai-gray-400 text-sm mb-2 break-anywhere">📍 {emergency.location}</p>
                             
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
                               <span className="text-xs text-ai-gray-500">
                                 {emergency.timestamp.toLocaleTimeString()}
                               </span>
@@ -486,7 +464,7 @@ const EmergencyDispatch: React.FC = () => {
                               e.stopPropagation();
                               calculateOptimalRoute(emergency);
                             }}
-                            className="px-3 py-1 bg-ai-white text-ai-black rounded-lg hover:bg-ai-gray-300 text-sm transition-colors"
+                            className="shrink-0 px-3 py-1.5 bg-ai-white text-ai-black rounded-lg hover:bg-ai-gray-300 text-sm transition-colors"
                           >
                             Dispatch
                           </motion.button>
@@ -499,8 +477,8 @@ const EmergencyDispatch: React.FC = () => {
                           animate={{ opacity: 1, height: 'auto' }}
                           className="mt-3 pt-3 border-t border-ai-gray-700"
                         >
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-ai-white">Unit: {emergency.assignedUnit}</span>
+                          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs sm:text-sm">
+                            <span className="text-ai-white break-anywhere">Unit: {emergency.assignedUnit}</span>
                             <span className="text-ai-white">ETA: {emergency.estimatedTime}m</span>
                             <span className="text-ai-white">{emergency.routeDistance}km</span>
                           </div>
@@ -525,14 +503,14 @@ const EmergencyDispatch: React.FC = () => {
             </div>
 
             {/* Map and Responders */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6 min-w-0">
               {/* Live Map */}
-              <div className="glass-light rounded-2xl p-6">
-                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                  <MapPin className="w-6 h-6 text-ai-white" />
+              <div className="glass-light rounded-2xl p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white shrink-0" />
                   Live Dispatch Map
                 </h3>
-                <div className="aspect-square bg-ai-gray-800/50 rounded-xl relative overflow-hidden">
+                <div className="aspect-[4/3] sm:aspect-square bg-ai-gray-800/50 rounded-xl relative overflow-hidden">
                   {/* Display uploaded venue image if available */}
                   {event?.mapFile ? (
                     <div className="absolute inset-0">
@@ -629,9 +607,9 @@ const EmergencyDispatch: React.FC = () => {
               </div>
 
               {/* Responder Units */}
-              <div className="glass-light rounded-2xl p-6">
-                <h3 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
-                  <Truck className="w-6 h-6 text-ai-white" />
+              <div className="glass-light rounded-2xl p-4 sm:p-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-white mb-4 flex flex-wrap items-center gap-2">
+                  <Truck className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white shrink-0" />
                   Responder Units
                   {eventDispatchUnits.length > 0 && isActive && (
                     <span className="text-sm text-ai-gray-400">({responders.length} from Event Setup)</span>
@@ -655,7 +633,7 @@ const EmergencyDispatch: React.FC = () => {
                           <span className="text-xl">{responderTypes[responder.type].icon}</span>
                           <div className="flex-1">
                             <div className="font-medium text-white">{responder.id}</div>
-                            <div className="text-sm text-ai-gray-400">{responder.location}</div>
+                            <div className="text-xs sm:text-sm text-ai-gray-400">{responder.location}</div>
                             {dispatchUnit && (
                               <div className="flex items-center gap-2 mt-1 text-xs text-ai-gray-500">
                                 {dispatchUnit.contact && (
@@ -671,9 +649,9 @@ const EmergencyDispatch: React.FC = () => {
                           </div>
                         </div>
                         
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 shrink-0">
                           {responder.eta && (
-                            <span className="text-sm text-ai-white">ETA: {responder.eta}m</span>
+                            <span className="text-sm text-ai-white whitespace-nowrap">ETA: {responder.eta}m</span>
                           )}
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             responder.status === 'available' ? 'bg-ai-white/20 text-ai-white' :

@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  Users, AlertTriangle, TrendingUp, Clock, Upload, 
-  Video, Activity, BarChart3, Camera, CheckCircle, 
-  XCircle, Loader
+  Users, Clock, Upload,
+  Video, Activity, BarChart3, Camera, Loader
 } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 import MeshGradient from '../components/MeshGradient';
@@ -20,7 +19,6 @@ const CrowdFlowAnalysis: React.FC = () => {
   const [historicalData, setHistoricalData] = useState<CrowdDensityData[]>([]);
   const [selectedZone, setSelectedZone] = useState<string | null>(null);
   const [zoneStats, setZoneStats] = useState<ZoneStatistics | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [hasUploadedVideo, setHasUploadedVideo] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -121,31 +119,25 @@ const CrowdFlowAnalysis: React.FC = () => {
     return 'text-green-500';
   };
 
-  const getDensityBgColor = (percentage: number) => {
-    if (percentage >= 80) return 'bg-red-500/20 border-red-500';
-    if (percentage >= 60) return 'bg-yellow-500/20 border-yellow-500';
-    return 'bg-green-500/20 border-green-500';
-  };
-
   return (
     <div className="relative min-h-screen bg-ai-black text-ai-white overflow-hidden">
       <MeshGradient />
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container max-w-7xl mx-auto">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
+            className="text-center mb-8 sm:mb-12"
           >
-            <Users className="w-16 h-16 mx-auto mb-4 text-ai-white" />
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <Users className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               Crowd Flow Analysis
             </h1>
-            <p className="text-ai-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto">
               Real-time crowd monitoring using OpenCV-powered video analysis
             </p>
           </motion.div>
@@ -154,15 +146,15 @@ const CrowdFlowAnalysis: React.FC = () => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-light rounded-2xl p-6 mb-8"
+            className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"
           >
             <div className="flex items-center gap-3 mb-4">
               <Video className="w-6 h-6 text-ai-white" />
-              <h3 className="text-xl font-semibold text-white">Upload Camera Footage</h3>
+              <h3 className="text-lg sm:text-xl font-semibold text-white">Upload Camera Footage</h3>
             </div>
             
             <div className="space-y-4">
-              <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex flex-col md:flex-row gap-3 md:gap-4">
                 <div className="flex-1">
                   <input
                     ref={fileInputRef}
@@ -174,17 +166,17 @@ const CrowdFlowAnalysis: React.FC = () => {
                   <button
                     onClick={() => fileInputRef.current?.click()}
                     disabled={isUploading}
-                    className="w-full px-4 py-3 bg-ai-gray-700 hover:bg-ai-gray-600 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                    className="w-full px-4 py-3 bg-ai-gray-700 hover:bg-ai-gray-600 rounded-xl flex items-center justify-center gap-2 transition-colors disabled:opacity-50 min-w-0"
                   >
-                    <Upload className="w-5 h-5" />
-                    {selectedVideo ? selectedVideo.name : 'Select Video File'}
+                    <Upload className="w-5 h-5 shrink-0" />
+                    <span className="truncate">{selectedVideo ? selectedVideo.name : 'Select Video File'}</span>
                   </button>
                 </div>
                 
                 <button
                   onClick={handleVideoUpload}
                   disabled={!selectedVideo || isUploading}
-                  className="px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="shrink-0 px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
                 >
                   {isUploading ? (
                     <>
@@ -208,7 +200,7 @@ const CrowdFlowAnalysis: React.FC = () => {
                     ? 'bg-red-500/20 border border-red-500'
                     : 'bg-blue-500/20 border border-blue-500'
                 }`}>
-                  <p className="text-sm">{uploadStatus}</p>
+                  <p className="text-sm break-anywhere">{uploadStatus}</p>
                 </div>
               )}
 
@@ -229,9 +221,9 @@ const CrowdFlowAnalysis: React.FC = () => {
 
           {/* Auto-refresh Toggle - Only show after video upload */}
           {hasUploadedVideo && (
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-white flex items-center gap-2">
-                <Activity className="w-6 h-6" />
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4 sm:mb-6">
+              <h3 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                <Activity className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
                 Live Density Monitor
               </h3>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -251,7 +243,7 @@ const CrowdFlowAnalysis: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8"
             >
               {latestDensity.map((zone) => (
                 <motion.div
@@ -264,12 +256,12 @@ const CrowdFlowAnalysis: React.FC = () => {
                       : 'border-transparent hover:border-ai-gray-600'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <Camera className="w-5 h-5 text-ai-white" />
-                      <h4 className="text-lg font-semibold text-white">{zone.zoneName}</h4>
+                  <div className="flex items-center justify-between gap-2 mb-4">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Camera className="w-5 h-5 text-ai-white shrink-0" />
+                      <h4 className="text-base sm:text-lg font-semibold text-white truncate">{zone.zoneName}</h4>
                     </div>
-                    <div className={`text-3xl font-bold ${getDensityColor(zone.densityPercentage)}`}>
+                    <div className={`text-2xl sm:text-3xl font-bold shrink-0 ${getDensityColor(zone.densityPercentage)}`}>
                       {Math.round(zone.densityPercentage)}%
                     </div>
                   </div>
@@ -318,7 +310,7 @@ const CrowdFlowAnalysis: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-light rounded-2xl p-12 text-center mb-8"
+              className="glass-light rounded-2xl p-6 sm:p-12 text-center mb-6 sm:mb-8"
             >
               <Loader className="w-16 h-16 mx-auto mb-4 text-ai-gray-400 animate-spin" />
               <p className="text-ai-gray-400 text-lg mb-2">Processing video data...</p>
@@ -333,12 +325,12 @@ const CrowdFlowAnalysis: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-light rounded-2xl p-6 mb-8"
+              className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="w-6 h-6 text-ai-white" />
-                  <h3 className="text-xl font-semibold text-white">
+              <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
+                <div className="flex items-center gap-3 min-w-0">
+                  <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-ai-white shrink-0" />
+                  <h3 className="text-lg sm:text-xl font-semibold text-white break-anywhere">
                     {zoneStats.zoneName} - Detailed Statistics
                   </h3>
                 </div>
@@ -347,16 +339,17 @@ const CrowdFlowAnalysis: React.FC = () => {
                     setSelectedZone(null);
                     setZoneStats(null);
                   }}
-                  className="text-ai-gray-400 hover:text-white transition-colors"
+                  aria-label="Close statistics"
+                  className="icon-btn shrink-0 p-1 text-ai-gray-400 hover:text-white transition-colors"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-6">
                 <div className="bg-ai-gray-800/50 rounded-xl p-4">
                   <div className="text-ai-gray-400 text-sm mb-2">Average Density</div>
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-xl sm:text-2xl font-bold text-white">
                     {Math.round(zoneStats.avgDensity)}%
                   </div>
                 </div>
@@ -368,13 +361,13 @@ const CrowdFlowAnalysis: React.FC = () => {
                 </div>
                 <div className="bg-ai-gray-800/50 rounded-xl p-4">
                   <div className="text-ai-gray-400 text-sm mb-2">Avg People</div>
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-xl sm:text-2xl font-bold text-white">
                     {Math.round(zoneStats.avgPeopleCount)}
                   </div>
                 </div>
                 <div className="bg-ai-gray-800/50 rounded-xl p-4">
                   <div className="text-ai-gray-400 text-sm mb-2">Data Points</div>
-                  <div className="text-2xl font-bold text-white">
+                  <div className="text-xl sm:text-2xl font-bold text-white">
                     {zoneStats.dataPoints}
                   </div>
                 </div>
@@ -387,23 +380,23 @@ const CrowdFlowAnalysis: React.FC = () => {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-light rounded-2xl p-6"
+              className="glass-light rounded-2xl p-4 sm:p-6"
             >
               <div className="flex items-center gap-3 mb-6">
                 <Clock className="w-6 h-6 text-ai-white" />
-                <h3 className="text-xl font-semibold text-white">Density Timeline</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-white">Density Timeline</h3>
               </div>
 
               <div className="space-y-3 max-h-96 overflow-y-auto">
-                {historicalData.map((data, index) => (
+                {historicalData.map((data) => (
                   <div
                     key={data._id}
-                    className="flex items-center gap-4 p-3 bg-ai-gray-800/50 rounded-lg"
+                    className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-4 p-3 bg-ai-gray-800/50 rounded-lg"
                   >
-                    <div className="flex-shrink-0 w-24 text-sm text-ai-gray-400">
+                    <div className="flex-shrink-0 w-16 sm:w-24 text-xs sm:text-sm text-ai-gray-400">
                       {data.videoTimestamp}
                     </div>
-                    <div className="flex-1">
+                    <div className="flex-1 order-last sm:order-none w-full sm:w-auto">
                       <div className="w-full bg-ai-gray-700 rounded-full h-2">
                         <div
                           className={`h-2 rounded-full ${
@@ -415,12 +408,12 @@ const CrowdFlowAnalysis: React.FC = () => {
                         />
                       </div>
                     </div>
-                    <div className="flex-shrink-0 w-20 text-right">
+                    <div className="flex-shrink-0 w-12 sm:w-20 text-right">
                       <span className={`font-semibold ${getDensityColor(data.densityPercentage)}`}>
                         {Math.round(data.densityPercentage)}%
                       </span>
                     </div>
-                    <div className="flex-shrink-0 w-16 text-right text-sm text-ai-gray-400">
+                    <div className="flex-shrink-0 w-auto sm:w-16 text-right text-xs sm:text-sm text-ai-gray-400">
                       {data.peopleCount} people
                     </div>
                   </div>

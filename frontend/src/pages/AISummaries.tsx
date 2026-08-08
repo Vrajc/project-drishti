@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Brain, Send, Mic, Volume2, MessageCircle, Clock, TrendingUp } from 'lucide-react';
+import { Brain, Send, MessageCircle } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
@@ -151,30 +151,32 @@ const AISummaries: React.FC = () => {
       <Spotlight />
       <Navbar />
       
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-8"
+            className="text-center mb-6 sm:mb-8"
           >
-            <Brain className="w-16 h-16 mx-auto mb-4 text-ai-white" />
-            <h1 className="text-heading text-4xl font-bold mb-4 text-ai-white">
+            <Brain className="w-10 h-10 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 text-ai-white" />
+            <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
               AI Safety Assistant
             </h1>
-            <p className="text-ai-gray-400 text-lg max-w-2xl mx-auto">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto">
               Get real-time insights and conversational analysis of your event's safety status
             </p>
           </motion.div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            {/* Quick Stats */}
-            <div className="lg:col-span-1 space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
+            {/* Quick Stats — below the chat on phones, beside it from lg up,
+                so the conversation isn't pushed off the first screen */}
+            <div className="lg:col-span-1 space-y-4 order-2 lg:order-1 min-w-0">
               <div className="glass-light rounded-2xl p-4">
-                <h3 className="text-lg font-semibold text-white mb-4">Live Metrics</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Live Metrics</h3>
                 
-                <div className="space-y-4">
+                {/* 2x2 on phones rather than a four-deep column */}
+                <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-ai-white">-</div>
                     <div className="text-sm text-ai-gray-400">Safety Score</div>
@@ -198,14 +200,14 @@ const AISummaries: React.FC = () => {
               </div>
 
               <div className="glass-light rounded-2xl p-4">
-                <h3 className="text-lg font-semibold text-white mb-4">Quick Questions</h3>
+                <h3 className="text-base sm:text-lg font-semibold text-white mb-4">Quick Questions</h3>
                 {quickQuestions.length === 0 ? (
                   <div className="text-center py-6">
                     <p className="text-ai-gray-500 text-sm">Set up an event to see quick questions</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {quickQuestions.map((question, index) => (
+                    {quickQuestions.map((question) => (
                       <motion.button
                         key={question}
                         whileHover={{ scale: 1.02 }}
@@ -222,7 +224,7 @@ const AISummaries: React.FC = () => {
             </div>
 
             {/* Chat Interface */}
-            <div className="glass-light rounded-2xl lg:col-span-3 overflow-hidden">
+            <div className="glass-light rounded-2xl lg:col-span-3 overflow-hidden order-1 lg:order-2 min-w-0 flex flex-col">
               <div className="flex items-center gap-3 p-4 border-b border-ai-gray-700">
                 <div className="w-10 h-10 bg-gradient-to-r from-ai-white to-ai-gray-300 rounded-full flex items-center justify-center">
                   <Brain className="w-5 h-5 text-ai-black" />
@@ -234,7 +236,7 @@ const AISummaries: React.FC = () => {
               </div>
 
               {/* Messages */}
-              <div className="h-96 overflow-y-auto p-4 space-y-4">
+              <div className="h-[55dvh] min-h-[18rem] lg:h-96 overflow-y-auto overscroll-contain p-3 sm:p-4 space-y-4">
                 {messages.map((message) => (
                   <motion.div
                     key={message.id}
@@ -242,12 +244,12 @@ const AISummaries: React.FC = () => {
                     animate={{ opacity: 1, y: 0 }}
                     className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl ${
+                    <div className={`max-w-[85%] sm:max-w-xs lg:max-w-md px-3 sm:px-4 py-2.5 sm:py-3 rounded-2xl ${
                       message.type === 'user'
-                        ? 'bg-ai-white text-ai-black ml-8'
-                        : 'bg-ai-gray-700/50 text-gray-100 mr-8'
+                        ? 'bg-ai-white text-ai-black ml-4 sm:ml-8'
+                        : 'bg-ai-gray-700/50 text-gray-100 mr-4 sm:mr-8'
                     }`}>
-                      <div className="whitespace-pre-wrap text-sm">{message.content}</div>
+                      <div className="whitespace-pre-wrap break-anywhere text-sm">{message.content}</div>
                       <div className={`text-xs mt-2 ${
                         message.type === 'user' ? 'text-ai-gray-600' : 'text-ai-gray-500'
                       }`}>
@@ -263,7 +265,7 @@ const AISummaries: React.FC = () => {
                     animate={{ opacity: 1 }}
                     className="flex justify-start"
                   >
-                    <div className="bg-ai-gray-700/50 text-gray-100 px-4 py-3 rounded-2xl mr-8">
+                    <div className="bg-ai-gray-700/50 text-gray-100 px-4 py-3 rounded-2xl mr-4 sm:mr-8">
                       <div className="flex items-center gap-2">
                         <div className="flex space-x-1">
                           <div className="w-2 h-2 bg-ai-white rounded-full animate-bounce"></div>
@@ -280,15 +282,15 @@ const AISummaries: React.FC = () => {
               </div>
 
               {/* Input */}
-              <div className="p-4 border-t border-ai-gray-700">
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 relative">
+              <div className="p-3 sm:p-4 border-t border-ai-gray-700">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="flex-1 min-w-0 relative">
                     <input
                       type="text"
                       value={inputMessage}
                       onChange={(e) => setInputMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      placeholder="Ask about event safety, crowd levels, alerts..."
+                      placeholder="Ask about safety, crowds, alerts..."
                       className="w-full px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
                     />
                   </div>
@@ -298,14 +300,15 @@ const AISummaries: React.FC = () => {
                     whileTap={{ scale: 0.95 }}
                     onClick={handleSendMessage}
                     disabled={!inputMessage.trim() || isTyping}
-                    className="p-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
+                    aria-label="Send message"
+                    className="icon-btn shrink-0 p-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity"
                   >
                     <Send className="w-5 h-5" />
                   </motion.button>
                 </div>
                 
-                <div className="mt-2 text-xs text-ai-gray-500 flex items-center gap-2">
-                  <MessageCircle className="w-3 h-3" />
+                <div className="mt-2 text-xs text-ai-gray-500 hidden sm:flex items-center gap-2">
+                  <MessageCircle className="w-3 h-3 shrink-0" />
                   Press Enter to send, Shift+Enter for new line
                 </div>
               </div>

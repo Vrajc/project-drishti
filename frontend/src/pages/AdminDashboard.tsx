@@ -1,9 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { useAuth } from '../contexts/AuthContext';
-import { useEvent } from '../contexts/EventContext';
-import { Shield, Users, Calendar, Activity, Database, Trash2, Eye, TrendingUp, BarChart3, Settings, FileText } from 'lucide-react';
-import FloatingElements from '../components/FloatingElements';
+import { useEvent, type Event } from '../contexts/EventContext';
+import { Shield, Users, Calendar, Activity, Database, Trash2, Eye, TrendingUp } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import GradientButton from '../components/GradientButton';
 import MeshGradient from '../components/MeshGradient';
@@ -13,28 +11,11 @@ import { incidentService } from '../services/incident.service';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface Event {
-  id: string;
-  name: string;
-  type: string;
-  date: string;
-  time: string;
-  location: string;
-  organizerId?: string;
-  organizerName?: string;
-  crowdSize: number;
-  registeredUsers?: string[];
-  zones: string[];
-  cameras: any[];
-  dispatchUnits: any[];
-}
-
 const AdminDashboard: React.FC = () => {
-  const { user } = useAuth();
   const { getAllEvents, deleteEvent } = useEvent();
   const [selectedTab, setSelectedTab] = useState<'overview' | 'events' | 'users' | 'analytics'>('overview');
   const [allIncidents, setAllIncidents] = useState<any[]>([]);
-  const [loadingIncidents, setLoadingIncidents] = useState(false);
+  const [, setLoadingIncidents] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
 
@@ -70,7 +51,7 @@ const AdminDashboard: React.FC = () => {
   // Helper function to check if event is live
   const isEventLive = (date: string, time: string): boolean => {
     const now = new Date();
-    
+
     // Parse the event date and time
     const eventDate = new Date(date);
     const [hours, minutes] = time.split(':').map(Number);
@@ -97,20 +78,6 @@ const AdminDashboard: React.FC = () => {
 
   // Calculate statistics with mock data
   const systemStats = useMemo(() => {
-    const now = new Date();
-    
-    // Get all registered users from localStorage
-    const storedUsers = localStorage.getItem('drishti_registered_users');
-    let allUsers: any[] = [];
-    try {
-      allUsers = storedUsers ? JSON.parse(storedUsers) : [];
-    } catch {
-      allUsers = [];
-    }
-
-    const organizers = allUsers.filter(u => u.role === 'organizer');
-    const participants = allUsers.filter(u => u.role === 'participant');
-    
     // Calculate event statuses using proper time-based logic
     const liveEvents = allEvents.filter(e => isEventLive(e.date, e.time));
 
@@ -375,17 +342,17 @@ const AdminDashboard: React.FC = () => {
       
       <Navbar />
 
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
+            className="mb-8 sm:mb-12"
           >
-            <h1 className="text-5xl font-bold mb-3 text-ai-white tracking-tight">
+            <h1 className="text-2xl xs:text-3xl sm:text-4xl lg:text-5xl font-bold mb-2 sm:mb-3 text-ai-white tracking-tight">
               System <span className="text-ai-gray-300">Administration</span>
             </h1>
-            <p className="text-ai-gray-400 text-lg">
+            <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg">
               Complete oversight of all events, users, and system analytics
             </p>
           </motion.div>
@@ -394,65 +361,65 @@ const AdminDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+            className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8"
           >
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Total Events</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Total Events</span>
                   <Calendar className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">{systemStats.totalEvents}</div>
-                <div className="text-sm text-ai-gray-500">{systemStats.activeEvents} live now</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{systemStats.totalEvents}</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">{systemStats.activeEvents} live now</div>
               </div>
             </motion.div>
 
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Total Users</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Total Users</span>
                   <Users className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">{systemStats.totalUsers.toLocaleString()}</div>
-                <div className="text-sm text-ai-gray-500">{systemStats.totalOrganizers} organizers</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{systemStats.totalUsers.toLocaleString()}</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">{systemStats.totalOrganizers} organizers</div>
               </div>
             </motion.div>
 
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Avg Safety Score</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Avg Safety Score</span>
                   <Shield className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">{systemStats.avgSafetyScore.toFixed(1)}</div>
-                <div className="text-sm text-ai-gray-500">Excellent</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{systemStats.avgSafetyScore.toFixed(1)}</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">Excellent</div>
               </div>
             </motion.div>
 
             <motion.div 
               whileHover={{ y: -4 }}
-              className="glass-light rounded-2xl p-6 border border-ai-gray-800 group relative overflow-hidden"
+              className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800 group relative overflow-hidden"
             >
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-medium text-ai-gray-400 tracking-wide">System Health</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">System Health</span>
                   <Activity className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">{systemStats.systemHealth}%</div>
-                <div className="text-sm text-ai-gray-500">Optimal</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{systemStats.systemHealth}%</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">Optimal</div>
               </div>
             </motion.div>
           </motion.div>
@@ -461,12 +428,12 @@ const AdminDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
-            className="glass-light rounded-2xl p-6 mb-8 border border-ai-gray-800"
+            className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8 border border-ai-gray-800"
           >
-            <div className="flex gap-4 mb-6 border-b border-ai-gray-800 pb-4">
+            <div className="scroll-x flex gap-2 sm:gap-4 mb-4 sm:mb-6 border-b border-ai-gray-800 pb-4 -mx-4 px-4 sm:mx-0 sm:px-0">
               <button
                 onClick={() => setSelectedTab('overview')}
-                className={`px-5 py-2.5 rounded-xl transition-all font-medium ${
+                className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2.5 rounded-xl transition-all text-sm sm:text-base font-medium ${
                   selectedTab === 'overview'
                     ? 'bg-ai-white text-ai-black'
                     : 'text-ai-gray-400 hover:text-ai-white hover:bg-ai-gray-900/50'
@@ -476,7 +443,7 @@ const AdminDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setSelectedTab('events')}
-                className={`px-5 py-2.5 rounded-xl transition-all font-medium ${
+                className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2.5 rounded-xl transition-all text-sm sm:text-base font-medium ${
                   selectedTab === 'events'
                     ? 'bg-ai-white text-ai-black'
                     : 'text-ai-gray-400 hover:text-ai-white hover:bg-ai-gray-900/50'
@@ -486,7 +453,7 @@ const AdminDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setSelectedTab('users')}
-                className={`px-5 py-2.5 rounded-xl transition-all font-medium ${
+                className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2.5 rounded-xl transition-all text-sm sm:text-base font-medium ${
                   selectedTab === 'users'
                     ? 'bg-ai-white text-ai-black'
                     : 'text-ai-gray-400 hover:text-ai-white hover:bg-ai-gray-900/50'
@@ -496,7 +463,7 @@ const AdminDashboard: React.FC = () => {
               </button>
               <button
                 onClick={() => setSelectedTab('analytics')}
-                className={`px-5 py-2.5 rounded-xl transition-all font-medium ${
+                className={`shrink-0 whitespace-nowrap px-4 sm:px-5 py-2.5 rounded-xl transition-all text-sm sm:text-base font-medium ${
                   selectedTab === 'analytics'
                     ? 'bg-ai-white text-ai-black'
                     : 'text-ai-gray-400 hover:text-ai-white hover:bg-ai-gray-900/50'
@@ -508,14 +475,14 @@ const AdminDashboard: React.FC = () => {
 
             {selectedTab === 'overview' && (
               <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-ai-gray-900/50 rounded-xl p-6 border border-ai-gray-800 hover:border-ai-gray-700 transition-colors group">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="bg-ai-gray-900/50 rounded-xl p-4 sm:p-6 border border-ai-gray-800 hover:border-ai-gray-700 transition-colors group">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 bg-ai-white/5 rounded-xl flex items-center justify-center group-hover:bg-ai-white/10 transition-colors">
                         <Calendar className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                       </div>
                       <div>
-                        <div className="text-sm text-ai-gray-500">Event Distribution</div>
+                        <div className="text-xs sm:text-sm text-ai-gray-500">Event Distribution</div>
                         <div className="text-lg font-semibold text-ai-white">By Status</div>
                       </div>
                     </div>
@@ -535,13 +502,13 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="bg-ai-gray-900/50 rounded-xl p-6 border border-ai-gray-800 hover:border-ai-gray-700 transition-colors group">
+                  <div className="bg-ai-gray-900/50 rounded-xl p-4 sm:p-6 border border-ai-gray-800 hover:border-ai-gray-700 transition-colors group">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 bg-ai-white/5 rounded-xl flex items-center justify-center group-hover:bg-ai-white/10 transition-colors">
                         <Users className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                       </div>
                       <div>
-                        <div className="text-sm text-ai-gray-500">User Statistics</div>
+                        <div className="text-xs sm:text-sm text-ai-gray-500">User Statistics</div>
                         <div className="text-lg font-semibold text-ai-white">Platform Users</div>
                       </div>
                     </div>
@@ -561,13 +528,13 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="bg-ai-gray-900/50 rounded-xl p-6 border border-ai-gray-800 hover:border-ai-gray-700 transition-colors group">
+                  <div className="bg-ai-gray-900/50 rounded-xl p-4 sm:p-6 border border-ai-gray-800 hover:border-ai-gray-700 transition-colors group">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 bg-ai-white/5 rounded-xl flex items-center justify-center group-hover:bg-ai-white/10 transition-colors">
                         <Shield className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                       </div>
                       <div>
-                        <div className="text-sm text-ai-gray-500">Safety Overview</div>
+                        <div className="text-xs sm:text-sm text-ai-gray-500">Safety Overview</div>
                         <div className="text-lg font-semibold text-ai-white">Incident Reports</div>
                       </div>
                     </div>
@@ -604,9 +571,9 @@ const AdminDashboard: React.FC = () => {
 
             {selectedTab === 'events' && (
               <div className="space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-semibold text-ai-white tracking-wide">All Events Across Platform</h3>
-                  <div className="text-sm text-ai-gray-400">{eventsWithStatus.length} events</div>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+                  <h3 className="text-lg sm:text-xl font-semibold text-ai-white tracking-wide">All Events Across Platform</h3>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">{eventsWithStatus.length} events</div>
                 </div>
 
                 {eventsWithStatus.length === 0 ? (
@@ -623,21 +590,21 @@ const AdminDashboard: React.FC = () => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
                       whileHover={{ x: 4 }}
-                      className="bg-ai-gray-900/50 rounded-xl p-5 border border-ai-gray-800 hover:border-ai-gray-700 transition-all"
+                      className="bg-ai-gray-900/50 rounded-xl p-4 sm:p-5 border border-ai-gray-800 hover:border-ai-gray-700 transition-all"
                     >
                       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-3">
-                            <h4 className="text-lg font-semibold text-ai-white">{event.name}</h4>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
+                            <h4 className="text-base sm:text-lg font-semibold text-ai-white break-anywhere">{event.name}</h4>
                             <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(event.status)}`}>
                               {event.status.toUpperCase()}
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-xs sm:text-sm">
                             <div>
                               <div className="text-ai-gray-500 mb-1">Organizer</div>
-                              <div className="text-ai-gray-300">{event.organizerName || 'Unknown'}</div>
+                              <div className="text-ai-gray-300 break-anywhere">{event.organizerName || 'Unknown'}</div>
                             </div>
                             <div>
                               <div className="text-ai-gray-500 mb-1">Date</div>
@@ -656,12 +623,12 @@ const AdminDashboard: React.FC = () => {
                           </div>
                         </div>
 
-                        <div className="flex gap-2">
+                        <div className="flex gap-2 shrink-0">
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => handleViewEvent(event)}
-                            className="px-4 py-2 bg-ai-white text-ai-black rounded-lg hover:shadow-lg hover:shadow-white/10 transition-all flex items-center gap-2 font-medium"
+                            className="flex-1 md:flex-none justify-center px-4 py-2 bg-ai-white text-ai-black rounded-lg hover:shadow-lg hover:shadow-white/10 transition-all flex items-center gap-2 font-medium"
                           >
                             <Eye className="w-4 h-4" />
                             View
@@ -671,7 +638,7 @@ const AdminDashboard: React.FC = () => {
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => setShowDeleteConfirm(event.id)}
-                            className="px-4 py-2 bg-ai-gray-900/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-lg text-ai-gray-400 hover:text-ai-white transition-all flex items-center gap-2"
+                            className="flex-1 md:flex-none justify-center px-4 py-2 bg-ai-gray-900/50 border border-ai-gray-800 hover:border-ai-gray-700 rounded-lg text-ai-gray-400 hover:text-ai-white transition-all flex items-center gap-2"
                           >
                             <Trash2 className="w-4 h-4" />
                             Delete
@@ -686,10 +653,10 @@ const AdminDashboard: React.FC = () => {
 
             {selectedTab === 'users' && (
               <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-white">User Management</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-white">User Management</h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                  <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 border border-gray-700/50">
                     <Users className="w-8 h-8 text-cyan-400 mb-3" />
                     <div className="text-2xl font-bold text-white mb-1">
                       {systemStats.totalParticipants.toLocaleString()}
@@ -700,7 +667,7 @@ const AdminDashboard: React.FC = () => {
                     </GradientButton>
                   </div>
 
-                  <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+                  <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 border border-gray-700/50">
                     <Calendar className="w-8 h-8 text-green-400 mb-3" />
                     <div className="text-2xl font-bold text-white mb-1">
                       {systemStats.totalOrganizers}
@@ -711,7 +678,7 @@ const AdminDashboard: React.FC = () => {
                     </GradientButton>
                   </div>
 
-                  <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+                  <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 border border-gray-700/50">
                     <Shield className="w-8 h-8 text-purple-400 mb-3" />
                     <div className="text-2xl font-bold text-white mb-1">
                       {systemStats.totalUsers - systemStats.totalParticipants - systemStats.totalOrganizers}
@@ -727,10 +694,10 @@ const AdminDashboard: React.FC = () => {
 
             {selectedTab === 'analytics' && (
               <div className="space-y-6">
-                <h3 className="text-xl font-semibold text-white">System Analytics</h3>
+                <h3 className="text-lg sm:text-xl font-semibold text-white">System Analytics</h3>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                  <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 border border-gray-700/50">
                     <div className="flex items-center gap-3 mb-4">
                       <TrendingUp className="w-6 h-6 text-green-400" />
                       <h4 className="text-lg font-semibold text-white">Platform Growth</h4>
@@ -751,7 +718,7 @@ const AdminDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="bg-gray-800/30 rounded-xl p-6 border border-gray-700/50">
+                  <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 border border-gray-700/50">
                     <div className="flex items-center gap-3 mb-4">
                       <Database className="w-6 h-6 text-blue-400" />
                       <h4 className="text-lg font-semibold text-white">System Resources</h4>
@@ -780,10 +747,10 @@ const AdminDashboard: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-            className="glass-light rounded-2xl p-6 border border-ai-gray-800"
+            className="glass-light rounded-2xl p-4 sm:p-6 border border-ai-gray-800"
           >
-            <h3 className="text-xl font-semibold text-ai-white mb-4">System Actions</h3>
-            <div className="flex flex-wrap gap-4">
+            <h3 className="text-lg sm:text-xl font-semibold text-ai-white mb-4">System Actions</h3>
+            <div className="flex flex-wrap gap-3 sm:gap-4">
               <GradientButton onClick={generateSystemReport}>
                 Generate System Report
               </GradientButton>
@@ -805,14 +772,15 @@ const AdminDashboard: React.FC = () => {
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="glass-light rounded-2xl p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-ai-gray-800"
+            className="glass-light rounded-2xl p-4 sm:p-6 max-w-2xl w-full max-h-[85dvh] overflow-y-auto overscroll-contain border border-ai-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-ai-white">{selectedEvent.name}</h2>
+            <div className="flex items-start justify-between gap-3 mb-4 sm:mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-ai-white break-anywhere">{selectedEvent.name}</h2>
               <button
                 onClick={closeEventModal}
-                className="text-ai-gray-400 hover:text-ai-white transition-colors"
+                aria-label="Close"
+                className="icon-btn shrink-0 -mr-1 p-1 text-ai-gray-400 hover:text-ai-white transition-colors"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -821,7 +789,7 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <div className="text-sm text-ai-gray-500 mb-1">Event Type</div>
                   <div className="text-ai-white font-medium">{selectedEvent.type}</div>
@@ -836,18 +804,18 @@ const AdminDashboard: React.FC = () => {
 
               <div>
                 <div className="text-sm text-ai-gray-500 mb-1">Location</div>
-                <div className="text-ai-white font-medium">{selectedEvent.location}</div>
+                <div className="text-ai-white font-medium break-anywhere">{selectedEvent.location}</div>
               </div>
 
               <div>
                 <div className="text-sm text-ai-gray-500 mb-1">Organizer</div>
                 <div className="text-ai-white font-medium">{selectedEvent.organizerName || 'Unknown'}</div>
                 {selectedEvent.organizerEmail && (
-                  <div className="text-sm text-ai-gray-400">{selectedEvent.organizerEmail}</div>
+                  <div className="text-sm text-ai-gray-400 break-anywhere">{selectedEvent.organizerEmail}</div>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 xs:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <div className="text-sm text-ai-gray-500 mb-1">Expected Crowd Size</div>
                   <div className="text-ai-white font-medium">{selectedEvent.crowdSize.toLocaleString()}</div>
@@ -928,15 +896,15 @@ const AdminDashboard: React.FC = () => {
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
-            className="glass-light rounded-2xl p-6 max-w-md w-full border border-ai-gray-800"
+            className="glass-light rounded-2xl p-4 sm:p-6 max-w-md w-full max-h-[85dvh] overflow-y-auto border border-ai-gray-800"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center">
+            <div className="flex items-center gap-3 sm:gap-4 mb-4">
+              <div className="w-12 h-12 shrink-0 bg-red-500/10 rounded-full flex items-center justify-center">
                 <Trash2 className="w-6 h-6 text-red-500" />
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-ai-white">Delete Event</h3>
+              <div className="min-w-0">
+                <h3 className="text-lg sm:text-xl font-bold text-ai-white">Delete Event</h3>
                 <p className="text-sm text-ai-gray-400">This action cannot be undone</p>
               </div>
             </div>

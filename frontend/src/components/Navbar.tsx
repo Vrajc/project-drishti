@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { LogOut, Menu, X, User } from 'lucide-react';
@@ -9,6 +9,32 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Close the drawer on navigation so it never lingers over the new page
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname]);
+
+  // Lock body scroll while the drawer is open, otherwise the page behind it
+  // scrolls under the user's finger on iOS
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [isMobileMenuOpen]);
+
+  // Escape closes the drawer (also covers phones with attached keyboards)
+  useEffect(() => {
+    if (!isMobileMenuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMobileMenuOpen]);
 
   const handleLogout = () => {
     logout();
@@ -64,11 +90,12 @@ const Navbar: React.FC = () => {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       className="fixed top-0 left-0 right-0 z-50 glassmorphism border-b border-ai-gray-800"
+      style={{ paddingTop: 'env(safe-area-inset-top)' }}
     >
-      <div className="w-full px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+      <div className="page-container">
+        <div className="flex justify-between items-center h-16 gap-2">
           <motion.div
-            whileHover={{ 
+            whileHover={{
               scale: 1.03,
               transition: {
                 type: 'spring',
@@ -78,19 +105,21 @@ const Navbar: React.FC = () => {
             }}
             whileTap={{ scale: 0.97 }}
             onClick={handleLogoClick}
-            className="flex items-center gap-3 cursor-pointer"
+            className="flex items-center gap-2 sm:gap-3 cursor-pointer shrink-0"
           >
-            <div className="w-9 h-9 bg-ai-white rounded flex items-center justify-center">
-              <span className="text-ai-black font-bold text-lg">✦</span>
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-ai-white rounded flex items-center justify-center shrink-0">
+              <span className="text-ai-black font-bold text-base sm:text-lg">✦</span>
             </div>
-            <span className="text-xl font-bold tracking-tight text-ai-white">Drishti</span>
+            <span className="text-lg sm:text-xl font-bold tracking-tight text-ai-white">Drishti</span>
           </motion.div>
 
-          <div className="hidden md:flex items-center space-x-1">
+          {/* Desktop nav — allowed to scroll rather than wrap if the role has
+              many items and the window is narrow */}
+          <div className="hidden md:flex items-center space-x-1 min-w-0 overflow-x-auto no-scrollbar">
             {navItems.map((item) => (
               <motion.button
                 key={item.path}
-                whileHover={{ 
+                whileHover={{
                   scale: 1.03,
                   y: -1,
                   transition: {
@@ -101,7 +130,7 @@ const Navbar: React.FC = () => {
                 }}
                 whileTap={{ scale: 0.97 }}
                 onClick={() => navigate(item.path)}
-                className={`px-4 py-2 rounded-lg transition-all text-sm font-medium ${
+                className={`px-3 lg:px-4 py-2 rounded-lg transition-all text-sm font-medium whitespace-nowrap ${
                   location.pathname === item.path
                     ? 'bg-ai-white text-ai-black shadow-lg'
                     : 'text-ai-gray-300 hover:text-ai-white hover:bg-ai-gray-900'
@@ -112,17 +141,17 @@ const Navbar: React.FC = () => {
             ))}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <div className="hidden md:flex items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-ai-gray-900 rounded-lg border border-ai-gray-800">
-                <User className="w-4 h-4 text-ai-gray-400" />
-                <span className="text-sm text-ai-gray-300">{user?.name}</span>
-                <span className="px-2 py-0.5 bg-ai-white text-ai-black rounded text-xs font-medium">
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-ai-gray-900 rounded-lg border border-ai-gray-800 max-w-[16rem]">
+                <User className="w-4 h-4 text-ai-gray-400 shrink-0" />
+                <span className="text-sm text-ai-gray-300 truncate">{user?.name}</span>
+                <span className="px-2 py-0.5 bg-ai-white text-ai-black rounded text-xs font-medium shrink-0">
                   {user?.role}
                 </span>
               </div>
               <motion.button
-                whileHover={{ 
+                whileHover={{
                   scale: 1.08,
                   rotate: 5,
                   transition: {
@@ -133,71 +162,94 @@ const Navbar: React.FC = () => {
                 }}
                 whileTap={{ scale: 0.92 }}
                 onClick={handleLogout}
-                className="p-2 text-ai-gray-400 hover:text-ai-white transition-colors rounded-lg hover:bg-ai-gray-900"
+                aria-label="Log out"
+                className="icon-btn p-2 text-ai-gray-400 hover:text-ai-white transition-colors rounded-lg hover:bg-ai-gray-900"
               >
                 <LogOut className="w-5 h-5" />
               </motion.button>
             </div>
 
+            {/* Always available on mobile — even for roles with no nav items,
+                since the drawer is the only route to the account and logout */}
             <motion.button
-              whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 text-ai-gray-400 hover:text-ai-white transition-colors rounded-lg hover:bg-ai-gray-900"
+              aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-expanded={isMobileMenuOpen}
+              className="icon-btn md:hidden p-2 -mr-2 text-ai-gray-400 hover:text-ai-white transition-colors rounded-lg hover:bg-ai-gray-900"
             >
               {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </motion.button>
           </div>
         </div>
-
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ 
-              duration: 0.3,
-              ease: [0.4, 0, 0.2, 1]
-            }}
-            className="md:hidden border-t border-ai-gray-800 py-4"
-          >
-            <div className="space-y-2">
-              {navItems.map((item) => (
-                <motion.button
-                  key={item.path}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => {
-                    navigate(item.path);
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`block w-full text-left px-4 py-2 rounded-lg transition-all text-sm font-medium ${
-                    location.pathname === item.path
-                      ? 'bg-ai-white text-ai-black'
-                      : 'text-ai-gray-300 hover:text-ai-white hover:bg-ai-gray-900'
-                  }`}
-                >
-                  {item.label}
-                </motion.button>
-              ))}
-              
-              <div className="pt-4 border-t border-ai-gray-800 mt-4">
-                <div className="flex items-center gap-2 px-4 py-2 text-sm text-ai-gray-300">
-                  <User className="w-4 h-4" />
-                  {user?.name} ({user?.role})
-                </div>
-                <motion.button
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-4 py-2 text-ai-gray-400 hover:text-ai-white transition-colors rounded-lg"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </motion.button>
-              </div>
-            </div>
-          </motion.div>
-        )}
       </div>
+
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <>
+            {/* Tap-away backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="md:hidden fixed inset-0 top-16 bg-black/60 backdrop-blur-sm -z-10"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{
+                duration: 0.3,
+                ease: [0.4, 0, 0.2, 1]
+              }}
+              className="md:hidden overflow-hidden border-t border-ai-gray-800 glassmorphism"
+            >
+              <div className="page-container py-4 max-h-[calc(100dvh-4rem)] overflow-y-auto safe-bottom">
+                <div className="space-y-1">
+                  {navItems.map((item) => (
+                    <motion.button
+                      key={item.path}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={() => {
+                        navigate(item.path);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className={`block w-full text-left px-4 py-3 rounded-lg transition-all text-base font-medium ${
+                        location.pathname === item.path
+                          ? 'bg-ai-white text-ai-black'
+                          : 'text-ai-gray-300 hover:text-ai-white hover:bg-ai-gray-900'
+                      }`}
+                    >
+                      {item.label}
+                    </motion.button>
+                  ))}
+
+                  <div className={`${navItems.length > 0 ? 'pt-4 mt-4 border-t border-ai-gray-800' : ''}`}>
+                    <div className="flex items-center gap-2 px-4 py-2 text-sm text-ai-gray-300">
+                      <User className="w-4 h-4 shrink-0" />
+                      <span className="truncate break-anywhere">{user?.name}</span>
+                      <span className="px-2 py-0.5 bg-ai-white text-ai-black rounded text-xs font-medium shrink-0">
+                        {user?.role}
+                      </span>
+                    </div>
+                    <motion.button
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleLogout}
+                      className="flex items-center gap-2 w-full px-4 py-3 text-ai-gray-400 hover:text-ai-white transition-colors rounded-lg hover:bg-ai-gray-900"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      Logout
+                    </motion.button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </motion.nav>
   );
 };

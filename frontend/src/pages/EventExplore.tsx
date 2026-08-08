@@ -5,23 +5,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useEvent } from '../contexts/EventContext';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
-import ParticleHero from '../components/ParticleHero';
 import Navbar from '../components/Navbar';
 
-interface Event {
-  id: string;
-  name: string;
-  type: string;
-  date: string;
-  time: string;
-  location: string;
-  crowdSize: number;
-  registered: number;
-  image: string;
-  organizerName: string;
-  description: string;
-  registeredUsers?: string[];
-}
 
 const EventExplore: React.FC = () => {
   const { user } = useAuth();
@@ -68,17 +53,17 @@ const EventExplore: React.FC = () => {
       <Spotlight />
       <Navbar />
 
-      <div className="relative z-10 pt-24 pb-12">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 pt-20 sm:pt-24 pb-8 sm:pb-12 safe-bottom">
+        <div className="page-container">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-12"
+            className="mb-8 sm:mb-12"
           >
-            <h1 className="text-heading text-5xl font-bold mb-4">
+            <h1 className="text-heading text-3xl sm:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4">
               Explore Events
             </h1>
-            <p className="text-body text-ai-gray-400 text-lg">
+            <p className="text-body text-ai-gray-400 text-sm sm:text-base lg:text-lg">
               Discover and register for amazing events happening near you
             </p>
           </motion.div>
@@ -87,9 +72,9 @@ const EventExplore: React.FC = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="glass-light rounded-2xl p-6 mb-8"
+            className="glass-light rounded-2xl p-4 sm:p-6 mb-6 sm:mb-8"
           >
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-ai-gray-400" />
                 <input
@@ -101,12 +86,12 @@ const EventExplore: React.FC = () => {
                 />
               </div>
 
-              <div className="relative">
+              <div className="relative w-full sm:w-auto">
                 <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-ai-gray-400" />
                 <select
                   value={selectedType}
                   onChange={(e) => setSelectedType(e.target.value)}
-                  className="pl-11 pr-8 py-3 bg-ai-black/50 border border-ai-gray-800 rounded-xl text-ai-white focus:border-ai-white focus:outline-none transition-colors appearance-none cursor-pointer"
+                  className="w-full sm:w-auto pl-11 pr-8 py-3 bg-ai-black/50 border border-ai-gray-800 rounded-xl text-ai-white focus:border-ai-white focus:outline-none transition-colors appearance-none cursor-pointer"
                 >
                   {eventTypes.map(type => (
                     <option key={type} value={type} className="bg-ai-gray-900">
@@ -118,7 +103,7 @@ const EventExplore: React.FC = () => {
             </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredEvents.map((event, index) => {
               const isRegistered = userRegisteredEventIds.includes(event.id);
               const registeredCount = event.registeredUsers?.length || 0;
@@ -132,19 +117,19 @@ const EventExplore: React.FC = () => {
                   transition={{ delay: index * 0.1 }}
                   className="glass-light rounded-2xl overflow-hidden group hover:scale-[1.02] transition-all duration-300"
                 >
-                  <div className="relative h-48 overflow-hidden bg-ai-gray-900">
+                  <div className="relative h-40 sm:h-48 overflow-hidden bg-ai-gray-900">
                     <img
                       src={event.image || 'https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg'}
                       alt={event.name}
                       className="w-full h-full object-cover group-hover:scale-110 opacity-80 transition-all duration-300 group-hover:opacity-100"
                     />
-                    <div className="absolute top-4 right-4 px-3 py-1 glass-medium rounded-full text-sm font-medium text-ai-white">
+                    <div className="absolute top-3 right-3 sm:top-4 sm:right-4 px-3 py-1 glass-medium rounded-full text-xs sm:text-sm font-medium text-ai-white">
                       {event.type}
                     </div>
                   </div>
 
-                  <div className="p-6">
-                    <h3 className="text-heading text-xl font-bold text-ai-white mb-2 line-clamp-1">
+                  <div className="p-4 sm:p-6">
+                    <h3 className="text-heading text-lg sm:text-xl font-bold text-ai-white mb-2 line-clamp-1">
                       {event.name}
                     </h3>
 
@@ -153,24 +138,24 @@ const EventExplore: React.FC = () => {
                     </p>
 
                     <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-ai-gray-300">
-                        <Calendar className="w-4 h-4 text-ai-gray-400" />
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:text-sm text-ai-gray-300">
+                        <Calendar className="w-4 h-4 text-ai-gray-400 shrink-0" />
                         <span>{new Date(event.date).toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric'
                         })}</span>
-                        <Clock className="w-4 h-4 text-ai-gray-400 ml-2" />
+                        <Clock className="w-4 h-4 text-ai-gray-400 sm:ml-2 shrink-0" />
                         <span>{event.time}</span>
                       </div>
 
-                      <div className="flex items-center gap-2 text-sm text-ai-gray-300">
-                        <MapPin className="w-4 h-4 text-ai-gray-400" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm text-ai-gray-300">
+                        <MapPin className="w-4 h-4 text-ai-gray-400 shrink-0" />
                         <span className="line-clamp-1">{event.location}</span>
                       </div>
 
-                      <div className="flex items-center gap-2 text-sm">
-                        <Users className="w-4 h-4 text-ai-gray-400" />
+                      <div className="flex items-center gap-2 text-xs sm:text-sm">
+                        <Users className="w-4 h-4 text-ai-gray-400 shrink-0" />
                         <span className={getCapacityColor(registeredCount, event.crowdSize)}>
                           {registeredCount.toLocaleString()} / {event.crowdSize.toLocaleString()} registered
                         </span>
@@ -188,7 +173,7 @@ const EventExplore: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-caption text-ai-gray-500 mb-4">
+                    <div className="text-caption text-xs sm:text-sm text-ai-gray-500 mb-4 break-anywhere">
                       Organized by {event.organizerName || 'Unknown'}
                     </div>
 
@@ -197,7 +182,7 @@ const EventExplore: React.FC = () => {
                       whileTap={{ scale: isRegistered || registeringEventId === event.id ? 1 : 0.98 }}
                       onClick={() => handleRegister(event.id)}
                       disabled={isRegistered || registeringEventId === event.id || capacityPercentage >= 100}
-                      className={`w-full py-3 px-6 rounded-xl font-medium transition-all duration-300 ${
+                      className={`w-full py-3 px-4 sm:px-6 rounded-xl text-sm sm:text-base font-medium transition-all duration-300 ${
                         isRegistered
                           ? 'bg-ai-white text-ai-black cursor-default'
                           : registeringEventId === event.id
@@ -223,7 +208,7 @@ const EventExplore: React.FC = () => {
               animate={{ opacity: 1 }}
               className="text-center py-12"
             >
-              <p className="text-ai-gray-400 text-lg">No events found matching your criteria</p>
+              <p className="text-ai-gray-400 text-base sm:text-lg">No events found matching your criteria</p>
             </motion.div>
           )}
         </div>

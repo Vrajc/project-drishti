@@ -16,6 +16,12 @@
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+  /* Stop sideways drift on mobile without creating a scroll container
+     (overflow-x:hidden on html would break position:sticky descendants) */
+  overflow-x: clip;
+  /* Prevent iOS/Android from inflating text in rotated or narrow viewports */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -29,6 +35,17 @@ body {
   color: #FFFFFF;
   line-height: 1.5;
   transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: clip;
+  /* Never let a single long word (event names, emails, IDs) blow out a layout */
+  overflow-wrap: break-word;
+}
+
+/* Fallback for browsers without `overflow: clip` support */
+@supports not (overflow: clip) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
 }
 
 /* ============================================
@@ -43,12 +60,15 @@ h1, h2, h3, h4, h5, h6 {
   margin: 0;
 }
 
-h1 { font-size: 3.75rem; }  /* 60px */
-h2 { font-size: 3rem; }     /* 48px */
-h3 { font-size: 2.25rem; }  /* 36px */
-h4 { font-size: 1.875rem; } /* 30px */
-h5 { font-size: 1.5rem; }   /* 24px */
-h6 { font-size: 1.25rem; }  /* 20px */
+/* Fluid type scale: each heading interpolates between a mobile-safe minimum
+   and the original desktop size, so nothing overflows a 320px viewport.
+   Tailwind `text-*` classes still override these where a page sets one. */
+h1 { font-size: clamp(2rem, 1.40rem + 3.00vw, 3.75rem); }   /* 32px → 60px */
+h2 { font-size: clamp(1.75rem, 1.30rem + 2.25vw, 3rem); }   /* 28px → 48px */
+h3 { font-size: clamp(1.5rem, 1.20rem + 1.50vw, 2.25rem); } /* 24px → 36px */
+h4 { font-size: clamp(1.25rem, 1.05rem + 1.00vw, 1.875rem);}/* 20px → 30px */
+h5 { font-size: clamp(1.125rem, 1.02rem + 0.53vw, 1.5rem); }/* 18px → 24px */
+h6 { font-size: clamp(1rem, 0.95rem + 0.25vw, 1.25rem); }   /* 16px → 20px */
 
 p {
   margin: 0;
@@ -63,9 +83,13 @@ a {
   position: relative;
 }
 
-a:hover {
-  color: #D4D4D4;
-  transform: translateX(2px);
+/* Only shift links on devices with a real pointer — on touch screens this
+   fires on tap and leaves the link visibly displaced after the finger lifts */
+@media (hover: hover) and (pointer: fine) {
+  a:hover {
+    color: #D4D4D4;
+    transform: translateX(2px);
+  }
 }
 
 /* Label styles */
@@ -93,8 +117,15 @@ small {
    ============================================ */
 
 .spacing-section {
-  padding-top: 6rem;
-  padding-bottom: 6rem;
+  padding-top: 3rem;
+  padding-bottom: 3rem;
+}
+
+@media (min-width: 768px) {
+  .spacing-section {
+    padding-top: 6rem;
+    padding-bottom: 6rem;
+  }
 }
 
 .spacing-container {
@@ -197,6 +228,45 @@ small {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* `glass-light` is the card surface used across every dashboard and panel
+   but had no definition, so those cards rendered fully transparent — their
+   text sat directly on the animated particle background. Most visible on
+   phones, where cards fill the width and there's no other separation. */
+.glass-light {
+  background: rgba(17, 17, 17, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Same story for the other two rungs of the surface scale */
+.glass-medium {
+  background: rgba(26, 26, 26, 0.8);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-strong {
+  background: rgba(38, 38, 38, 0.88);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* backdrop-filter is unreliable on older mobile browsers; fall back to an
+   opaque surface so content never becomes unreadable */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass-light,
+  .glass-medium,
+  .glass-strong,
+  .glassmorphism,
+  .glassmorphism-light,
+  .glassmorphism-strong {
+    background: rgba(14, 14, 14, 0.96);
+  }
+}
+
 /* ============================================
    INPUT & FORM ELEMENTS - DARK MODE OPTIMIZED
    ============================================ */
@@ -207,8 +277,25 @@ input, textarea, select {
   color: #FFFFFF;
   padding: 0.625rem 0.875rem;
   border-radius: 0.5rem;
-  font-size: 0.875rem;
+  /* 16px on touch viewports: iOS Safari force-zooms the page whenever a
+     focused field is under 16px, and never zooms back out. Drops to the
+     designed 14px once there's room for it. */
+  font-size: 1rem;
+  max-width: 100%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (min-width: 640px) {
+  input, textarea, select {
+    font-size: 0.875rem;
+  }
+}
+
+/* Native pickers render unreadably small on iOS without an explicit size */
+input[type='date'],
+input[type='time'],
+input[type='datetime-local'] {
+  min-height: 2.75rem;
 }
 
 input:focus, textarea:focus, select:focus {
@@ -247,10 +334,18 @@ input:disabled, textarea:disabled, select:disabled {
   box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15);
 }
 
-.card-hover:hover {
-  transform: translateY(-4px) scale(1.01);
-  border-color: #525252;
-  box-shadow: 0 12px 40px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05);
+@media (hover: hover) and (pointer: fine) {
+  .card-hover:hover {
+    transform: translateY(-4px) scale(1.01);
+    border-color: #525252;
+    box-shadow: 0 12px 40px 0 rgba(255, 255, 255, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+}
+
+@media (max-width: 767px) {
+  .card-base {
+    padding: 1rem;
+  }
 }
 
 /* ============================================
@@ -467,9 +562,11 @@ input:disabled, textarea:disabled, select:disabled {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.ai-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1);
+@media (hover: hover) and (pointer: fine) {
+  .ai-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 40px rgba(255, 255, 255, 0.1);
+  }
 }
 
 /* Minimal Divider */
@@ -560,9 +657,11 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.hover-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.08);
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(255, 255, 255, 0.08);
+  }
 }
 
 /* Hover glow effect */
@@ -628,5 +727,192 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+/* ============================================
+   RESPONSIVE FOUNDATION
+   Shared primitives used by every page so the
+   breakpoint behaviour stays consistent.
+   ============================================ */
+
+/* --- Page shell -----------------------------------------------------
+   Standard horizontal gutters + max width. Replaces the ad-hoc
+   `w-full px-4 sm:px-6 lg:px-8` repeated across pages, and adds the
+   left/right safe-area inset needed now that the viewport is
+   `viewport-fit=cover` (landscape notches would otherwise clip content). */
+.page-container {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+@media (min-width: 640px) {
+  .page-container {
+    padding-left: max(1.5rem, env(safe-area-inset-left));
+    padding-right: max(1.5rem, env(safe-area-inset-right));
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    padding-left: max(2rem, env(safe-area-inset-left));
+    padding-right: max(2rem, env(safe-area-inset-right));
+  }
+}
+
+/* Content that should stop stretching on ultra-wide monitors */
+.page-container-narrow {
+  max-width: 90rem;
+}
+
+/* Clears the 4rem fixed navbar, plus the notch on iOS */
+.page-top-offset {
+  padding-top: calc(4rem + env(safe-area-inset-top));
+}
+
+/* Keeps the last row of content above the iOS home indicator */
+.safe-bottom {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+}
+
+/* --- Touch targets --------------------------------------------------
+   WCAG 2.5.8 / platform HIG minimum. Applied on coarse pointers only so
+   the tighter desktop density is preserved. */
+@media (pointer: coarse) {
+  button,
+  [role='button'],
+  a.btn,
+  input[type='submit'],
+  input[type='button'],
+  select {
+    min-height: 44px;
+  }
+
+  /* Icon-only controls need width too */
+  button.icon-btn,
+  a.icon-btn {
+    min-width: 44px;
+  }
+
+  /* Checkbox/radio hit areas */
+  input[type='checkbox'],
+  input[type='radio'] {
+    min-width: 1.25rem;
+    min-height: 1.25rem;
+  }
+}
+
+/* Opt-out for chips/tags/pagination that are intentionally compact and
+   already have generous padding around them */
+@media (pointer: coarse) {
+  .touch-target-exempt,
+  .touch-target-exempt button {
+    min-height: 0;
+    min-width: 0;
+  }
+}
+
+/* --- Horizontal scroll containers -----------------------------------
+   Tab strips and filter rows: scroll instead of wrapping or overflowing. */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.scroll-x::-webkit-scrollbar {
+  display: none;
+}
+
+.scroll-x > * {
+  scroll-snap-align: start;
+}
+
+/* Hide scrollbars anywhere they'd be visual noise on mobile */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- Tables ---------------------------------------------------------
+   Wide data tables stay readable by scrolling inside their own box
+   rather than widening the page. */
+.table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-scroll > table {
+  min-width: 40rem;
+}
+
+/* --- Media ----------------------------------------------------------- */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+img,
+video {
+  height: auto;
+}
+
+/* --- Long strings ----------------------------------------------------
+   Emails, URLs and generated IDs must not force a page-wide scrollbar. */
+.break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* --- Mobile scrollbar ------------------------------------------------ */
+@media (max-width: 767px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+}
+
+/* --- Short/landscape phones ------------------------------------------
+   Full-height hero sections trap content off-screen when the viewport is
+   only ~380px tall, so release the min-height there. */
+@media (max-height: 500px) and (orientation: landscape) {
+  .hero-min-h {
+    min-height: 0;
+  }
+}
+
+/* --- Dynamic viewport height -----------------------------------------
+   `100vh` on mobile browsers includes the collapsing URL bar, which cuts
+   off the bottom of full-screen panels. `dvh` tracks the visible area. */
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.h-screen-safe {
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* --- Motion preferences ---------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

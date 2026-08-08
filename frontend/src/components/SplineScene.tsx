@@ -14,10 +14,10 @@ const SplineScene: React.FC<SplineSceneProps> = ({ className = '' }) => {
       className={`relative ${className}`}
     >
       {/* 3D-like geometric composition */}
-      <div className="relative w-full h-full flex items-center justify-center">
+      <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
         {/* Main central sphere */}
         <motion.div
-          className="absolute w-64 h-64 rounded-full border border-text-tertiary/20"
+          className="absolute w-44 h-44 sm:w-56 sm:h-56 lg:w-64 lg:h-64 rounded-full border border-text-tertiary/20"
           animate={{
             scale: [1, 1.05, 1],
             rotate: [0, 360],
@@ -41,7 +41,7 @@ const SplineScene: React.FC<SplineSceneProps> = ({ className = '' }) => {
 
         {/* Orbiting elements */}
         <motion.div
-          className="absolute w-48 h-48 rounded-full border border-text-tertiary/30"
+          className="absolute w-32 h-32 sm:w-40 sm:h-40 lg:w-48 lg:h-48 rounded-full border border-text-tertiary/30"
           animate={{
             rotate: [0, 360],
           }}
@@ -55,7 +55,7 @@ const SplineScene: React.FC<SplineSceneProps> = ({ className = '' }) => {
         </motion.div>
 
         <motion.div
-          className="absolute w-56 h-56 rounded-full border border-text-tertiary/15"
+          className="absolute w-36 h-36 sm:w-44 sm:h-44 lg:w-56 lg:h-56 rounded-full border border-text-tertiary/15"
           animate={{
             rotate: [360, 0],
           }}
@@ -70,7 +70,7 @@ const SplineScene: React.FC<SplineSceneProps> = ({ className = '' }) => {
 
         {/* Floating geometric shapes */}
         <motion.div
-          className="absolute w-16 h-16 border border-text-tertiary/40"
+          className="absolute w-10 h-10 sm:w-14 sm:h-14 lg:w-16 lg:h-16 border border-text-tertiary/40"
           style={{ top: '20%', right: '15%' }}
           animate={{
             y: [0, -20, 0],
@@ -84,7 +84,7 @@ const SplineScene: React.FC<SplineSceneProps> = ({ className = '' }) => {
         />
 
         <motion.div
-          className="absolute w-12 h-12 rounded-full border border-text-tertiary/30"
+          className="absolute w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-full border border-text-tertiary/30"
           style={{ bottom: '25%', left: '10%' }}
           animate={{
             y: [0, 15, 0],

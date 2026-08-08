@@ -22,12 +22,12 @@ const HeroButtonExpandable: React.FC<HeroButtonExpandableProps> = ({
     : 'bg-transparent text-text-primary border border-border-medium';
 
   return (
-    <div className="relative w-[200px]">
+    <div className="relative w-full sm:w-[200px]">
       <motion.button
         onHoverStart={() => expandedContent && setIsExpanded(true)}
         onHoverEnd={() => setIsExpanded(false)}
         onClick={onClick}
-        className={`w-full px-8 py-4 rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 ${buttonClass} overflow-hidden`}
+        className={`w-full px-6 sm:px-8 py-3.5 sm:py-4 rounded-lg font-medium transition-all duration-300 flex items-center justify-center gap-2 ${buttonClass} overflow-hidden`}
         whileHover={{ 
           scale: 1.03,
           y: -2,
@@ -63,7 +63,7 @@ const HeroButtonExpandable: React.FC<HeroButtonExpandableProps> = ({
               duration: 0.3,
               ease: [0.4, 0, 0.2, 1]
             }}
-            className="absolute top-full left-0 mt-2 w-64 glassmorphism-strong rounded-lg p-4 shadow-strong z-50"
+            className="absolute top-full left-0 mt-2 w-full sm:w-64 max-w-[calc(100vw-2rem)] glassmorphism-strong rounded-lg p-4 shadow-strong z-50"
           >
             {expandedContent}
           </motion.div>
