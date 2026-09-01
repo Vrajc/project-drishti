@@ -56,7 +56,18 @@ const Navbar: React.FC = () => {
         // Hide navigation items for all organizer pages
         return [];
       case 'admin':
-        return [];
+        // The camera registry is estate-wide, so it sits in the nav rather than
+        // behind an event the way the organizer pages do.
+        return [
+          { label: 'Dashboard', path: '/admin-dashboard' },
+          { label: 'Camera Registry', path: '/surveillance/cameras' },
+          { label: 'Camera Map', path: '/surveillance/map' }
+        ];
+      case 'police':
+        return [
+          { label: 'Camera Registry', path: '/surveillance/cameras' },
+          { label: 'Camera Map', path: '/surveillance/map' }
+        ];
       default:
         return [];
     }
@@ -79,6 +90,9 @@ const Navbar: React.FC = () => {
         break;
       case 'admin':
         navigate('/admin-dashboard');
+        break;
+      case 'police':
+        navigate('/surveillance/cameras');
         break;
       default:
         navigate('/');

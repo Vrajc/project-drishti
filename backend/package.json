@@ -16,7 +16,8 @@
     "prisma:migrate": "npx prisma migrate dev",
     "prisma:studio": "npx prisma studio",
     "prisma:deploy": "npx prisma migrate deploy",
-    "prisma:reset": "npx prisma migrate reset"
+    "prisma:reset": "npx prisma migrate reset",
+    "seed:cameras": "npx tsx prisma/seed-cameras.ts"
   },
   "keywords": [
     "event-safety",

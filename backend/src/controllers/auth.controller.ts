@@ -74,10 +74,11 @@ export const register = async (req: Request, res: Response) => {
     const hashedPassword = await bcrypt.hash(password, salt);
 
     // Map role string to enum
-    const roleMap: Record<string, 'ORGANIZER' | 'PARTICIPANT' | 'ADMIN'> = {
+    const roleMap: Record<string, 'ORGANIZER' | 'PARTICIPANT' | 'ADMIN' | 'POLICE'> = {
       organizer: 'ORGANIZER',
       participant: 'PARTICIPANT',
       admin: 'ADMIN',
+      police: 'POLICE',
     };
 
     // Save to database

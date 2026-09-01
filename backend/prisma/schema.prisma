@@ -25,8 +25,8 @@ model User {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  organizedEvents Event[]    @relation("OrganizedEvents")
-  registeredEvents EventRegistration[]
+  organizedEvents   Event[]             @relation("OrganizedEvents")
+  registeredEvents  EventRegistration[]
   reportedIncidents Incident[]
 
   @@index([email])
@@ -38,36 +38,37 @@ enum UserRole {
   ORGANIZER
   PARTICIPANT
   ADMIN
+  POLICE
 }
 
 // ============================================
 // EVENT MODEL
 // ============================================
 model Event {
-  id              String   @id @default(uuid())
-  name            String
-  type            String
-  date            String
-  time            String
-  crowdSize       Int
-  location        String
-  description     String?
-  mapFile         String?  // Base64 encoded map image
-  image           String?
-  organizerId     String
-  organizerEmail  String
-  organizerName   String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  name           String
+  type           String
+  date           String
+  time           String
+  crowdSize      Int
+  location       String
+  description    String?
+  mapFile        String? // Base64 encoded map image
+  image          String?
+  organizerId    String
+  organizerEmail String
+  organizerName  String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  organizer       User      @relation("OrganizedEvents", fields: [organizerId], references: [id], onDelete: Cascade)
-  zones           Zone[]
-  cameras         Camera[]
-  dispatchUnits   DispatchUnit[]
-  registrations   EventRegistration[]
-  incidents       Incident[]
-  crowdDensities  CrowdDensity[]
+  organizer      User                @relation("OrganizedEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  zones          Zone[]
+  cameras        Camera[]
+  dispatchUnits  DispatchUnit[]
+  registrations  EventRegistration[]
+  incidents      Incident[]
+  crowdDensities CrowdDensity[]
 
   @@index([organizerId])
   @@index([date])
@@ -79,18 +80,18 @@ model Event {
 // ZONE MODEL (Sub-entity of Event)
 // ============================================
 model Zone {
-  id           String   @id @default(uuid())
-  eventId      String
-  zoneId       String   // Custom zone identifier
-  name         String
-  coordinates  Json     // Array of {x, y} coordinates
-  maxCapacity  Int
-  color        String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(uuid())
+  eventId     String
+  zoneId      String // Custom zone identifier
+  name        String
+  coordinates Json // Array of {x, y} coordinates
+  maxCapacity Int
+  color       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  event        Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
   crowdDensities CrowdDensity[]
 
   @@unique([eventId, zoneId])
@@ -99,45 +100,154 @@ model Zone {
 }
 
 // ============================================
-// CAMERA MODEL (Sub-entity of Event)
+// CAMERA MODEL (standalone registry; optionally attached to an Event)
 // ============================================
+// A camera exists in the registry whether or not an event is using it, so
+// `eventId` is nullable. `@@unique([eventId, cameraId])` still guards cameras
+// attached to an event; Postgres treats NULLs as distinct, so registry-only
+// cameras are guarded instead by a partial unique index created in the
+// add_camera_registry migration (cameras_registry_cameraId_key).
 model Camera {
-  id          String   @id @default(uuid())
-  eventId     String
-  cameraId    String   // Custom camera identifier
-  name        String
-  location    String
-  ipAddress   String
-  rtspUrl     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String  @id @default(uuid())
+  eventId   String?
+  cameraId  String // Custom camera identifier, e.g. "GNR-SEC-014"
+  name      String
+  location  String
+  ipAddress String
+  rtspUrl   String
+
+  // --- GIS ---
+  // WGS84. Null means the camera has been registered but not yet surveyed;
+  // the map lists those separately rather than dropping a pin at 0,0.
+  latitude       Float?
+  longitude      Float?
+  // Compass bearing the lens faces, 0-360 degrees clockwise from north.
+  coverageAngle  Float?
+  // Effective viewing range in metres, as declared by the installer.
+  coverageRadius Float?
+  isPtz          Boolean @default(false)
+
+  // --- Hardware and connection, as declared in the deployment inventory ---
+  vendor      String?
+  model       String?
+  protocol    String? // RTSP | ONVIF | HTTP
+  onvifUrl    String?
+  username    String?
+  passwordEnc String? // Encrypted at rest; never returned by the API
+  resolution  String? // Configured, e.g. "1920x1080"
+  fps         Int? // Configured, not measured
+
+  // --- Observed state ---
+  // UNKNOWN until a health check actually reaches the stream. Nothing writes
+  // ONLINE without a successful probe, and lastSeenAt stays null until then.
+  status     CameraStatus @default(UNKNOWN)
+  lastSeenAt DateTime?
+
+  departmentId String?
+  siteId       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event          Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  department     Department?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  site           Site?          @relation(fields: [siteId], references: [id], onDelete: SetNull)
   crowdDensities CrowdDensity[]
+  healthChecks   CameraHealth[]
 
   @@unique([eventId, cameraId])
   @@index([eventId])
+  @@index([status])
+  @@index([departmentId])
+  @@index([siteId])
   @@map("cameras")
+}
+
+enum CameraStatus {
+  ONLINE
+  OFFLINE
+  DEGRADED
+  UNKNOWN
+}
+
+// ============================================
+// DEPARTMENT MODEL (owner of a group of cameras)
+// ============================================
+model Department {
+  id           String   @id @default(uuid())
+  code         String   @unique // e.g. "GNR-CITY"
+  name         String
+  contactName  String?
+  contactPhone String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sites   Site[]
+  cameras Camera[]
+
+  @@map("departments")
+}
+
+// ============================================
+// SITE MODEL (a physical location within a department)
+// ============================================
+model Site {
+  id           String   @id @default(uuid())
+  departmentId String?
+  code         String   @unique
+  name         String
+  address      String?
+  latitude     Float?
+  longitude    Float?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  cameras    Camera[]
+
+  @@index([departmentId])
+  @@map("sites")
+}
+
+// ============================================
+// CAMERA HEALTH MODEL (one row per reachability probe)
+// ============================================
+// Every row here is the result of an actual probe. `cameraId` is a foreign key
+// to cameras.id (the UUID), NOT the human-facing Camera.cameraId string.
+model CameraHealth {
+  id          String       @id @default(uuid())
+  cameraId    String
+  checkedAt   DateTime     @default(now())
+  status      CameraStatus
+  latencyMs   Int? // Measured round trip, null if the probe never connected
+  fpsObserved Float? // Measured, null until a decoder reports it
+  error       String? // Verbatim failure reason when status is not ONLINE
+
+  camera Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+
+  @@index([cameraId, checkedAt])
+  @@index([checkedAt])
+  @@map("camera_health")
 }
 
 // ============================================
 // DISPATCH UNIT MODEL (Sub-entity of Event)
 // ============================================
 model DispatchUnit {
-  id          String   @id @default(uuid())
-  eventId     String
-  unitId      String   // Custom unit identifier
-  name        String
-  type        String
-  contact     String
-  capacity    Int
-  location    String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  eventId   String
+  unitId    String // Custom unit identifier
+  name      String
+  type      String
+  contact   String
+  capacity  Int
+  location  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([eventId, unitId])
   @@index([eventId])
@@ -148,14 +258,14 @@ model DispatchUnit {
 // EVENT REGISTRATION MODEL (Many-to-Many)
 // ============================================
 model EventRegistration {
-  id          String   @id @default(uuid())
-  userId      String
-  eventId     String
+  id           String   @id @default(uuid())
+  userId       String
+  eventId      String
   registeredAt DateTime @default(now())
 
   // Relations
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
   @@unique([userId, eventId])
   @@index([userId])
@@ -167,23 +277,23 @@ model EventRegistration {
 // INCIDENT MODEL
 // ============================================
 model Incident {
-  id              String         @id @default(uuid())
-  eventId         String
-  type            IncidentType
-  description     String
-  location        String
-  timestamp       DateTime       @default(now())
-  reporter        String
-  reporterEmail   String?
-  status          IncidentStatus @default(OPEN)
-  responseTime    Int?           // in seconds
-  resolvedAt      DateTime?
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  id            String         @id @default(uuid())
+  eventId       String
+  type          IncidentType
+  description   String
+  location      String
+  timestamp     DateTime       @default(now())
+  reporter      String
+  reporterEmail String?
+  status        IncidentStatus @default(OPEN)
+  responseTime  Int? // in seconds
+  resolvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   // Relations
-  event           Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  reporterUser    User           @relation(fields: [reporter], references: [id])
+  event        Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  reporterUser User  @relation(fields: [reporter], references: [id])
 
   @@index([eventId])
   @@index([eventId, status])
@@ -216,22 +326,22 @@ model CrowdDensity {
   peopleCount       Int
   densityPercentage Float
   timestamp         DateTime
-  videoTimestamp    String   // Format: HH:MM:SS
+  videoTimestamp    String // Format: HH:MM:SS
   cameraId          String?
   cameraName        String?
-  
+
   // Metadata fields
-  frameNumber       Int?
-  confidence        Float?
-  processingTime    Float?
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  frameNumber    Int?
+  confidence     Float?
+  processingTime Float?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  event             Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  zone              Zone?    @relation(fields: [zoneId], references: [id], onDelete: Cascade)
-  camera            Camera?  @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  event  Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  camera Camera? @relation(fields: [cameraId], references: [id], onDelete: SetNull)
 
   @@index([eventId])
   @@index([zoneId])
@@ -248,9 +358,9 @@ model CrowdDensity {
 // AI Summary/Analysis Cache
 model AISummary {
   id          String   @id @default(uuid())
-  entityType  String   // 'event', 'incident', 'crowd_analysis'
+  entityType  String // 'event', 'incident', 'crowd_analysis'
   entityId    String
-  summaryType String   // 'general', 'risk', 'recommendation'
+  summaryType String // 'general', 'risk', 'recommendation'
   content     String   @db.Text
   metadata    Json?
   createdAt   DateTime @default(now())
@@ -281,16 +391,16 @@ model SystemLog {
 
 // Notification table for real-time alerts
 model Notification {
-  id          String           @id @default(uuid())
-  userId      String?
-  eventId     String?
-  type        NotificationType
-  title       String
-  message     String           @db.Text
-  isRead      Boolean          @default(false)
-  priority    NotificationPriority @default(NORMAL)
-  metadata    Json?
-  createdAt   DateTime         @default(now())
+  id        String               @id @default(uuid())
+  userId    String?
+  eventId   String?
+  type      NotificationType
+  title     String
+  message   String               @db.Text
+  isRead    Boolean              @default(false)
+  priority  NotificationPriority @default(NORMAL)
+  metadata  Json?
+  createdAt DateTime             @default(now())
 
   @@index([userId, isRead])
   @@index([eventId])

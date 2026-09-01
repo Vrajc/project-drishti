@@ -1,0 +1,247 @@
+import axios from 'axios';
+
+const API_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5001/api'}/surveillance`;
+
+export type CameraStatus = 'ONLINE' | 'OFFLINE' | 'DEGRADED' | 'UNKNOWN';
+
+export interface CameraRef {
+  id: string;
+  code?: string;
+  name: string;
+}
+
+export interface HealthCheck {
+  id: string;
+  checkedAt: string;
+  status: CameraStatus;
+  latencyMs: number | null;
+  fpsObserved: number | null;
+  error: string | null;
+}
+
+export interface RegistryCamera {
+  id: string;
+  cameraId: string;
+  name: string;
+  location: string;
+  ipAddress: string;
+  rtspUrl: string;
+
+  // Null until the camera has been surveyed. Render an empty state, never a
+  // substituted coordinate.
+  latitude: number | null;
+  longitude: number | null;
+  coverageAngle: number | null;
+  coverageRadius: number | null;
+  isPtz: boolean;
+
+  vendor: string | null;
+  model: string | null;
+  protocol: string | null;
+  onvifUrl: string | null;
+  username: string | null;
+  resolution: string | null;
+  fps: number | null;
+
+  // UNKNOWN with lastSeenAt null means no probe has reached this camera yet.
+  status: CameraStatus;
+  lastSeenAt: string | null;
+
+  departmentId: string | null;
+  siteId: string | null;
+  eventId: string | null;
+
+  department: CameraRef | null;
+  site: CameraRef | null;
+  event: { id: string; name: string } | null;
+
+  hasCredentials: boolean;
+  healthChecks?: HealthCheck[];
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Department {
+  id: string;
+  code: string;
+  name: string;
+  contactName: string | null;
+  contactPhone: string | null;
+  cameraCount: number;
+  siteCount: number;
+}
+
+export interface Site {
+  id: string;
+  code: string;
+  name: string;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  department: CameraRef | null;
+  cameraCount: number;
+}
+
+export interface RegistryStats {
+  total: number;
+  byStatus: Record<CameraStatus, number>;
+  located: number;
+  unlocated: number;
+  ptz: number;
+  attachedToEvent: number;
+  registryOnly: number;
+  byDepartment: Array<{ id: string; code: string; name: string; cameraCount: number }>;
+  /** Null until a health check has actually run. */
+  lastHealthCheckAt: string | null;
+}
+
+export interface CameraQuery {
+  q?: string;
+  status?: string;
+  departmentId?: string;
+  siteId?: string;
+  eventId?: string;
+  located?: boolean;
+  skip?: number;
+  take?: number;
+}
+
+export interface CameraPayload {
+  cameraId: string;
+  name: string;
+  location: string;
+  ipAddress?: string;
+  rtspUrl: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  coverageAngle?: number | null;
+  coverageRadius?: number | null;
+  isPtz?: boolean;
+  vendor?: string | null;
+  model?: string | null;
+  protocol?: string | null;
+  onvifUrl?: string | null;
+  username?: string | null;
+  password?: string | null;
+  resolution?: string | null;
+  fps?: number | null;
+  departmentId?: string | null;
+  siteId?: string | null;
+  eventId?: string | null;
+}
+
+function authHeaders() {
+  const token = localStorage.getItem('drishti_token');
+  if (!token) {
+    throw new Error('Authentication token not found. Sign in again to reach the camera registry.');
+  }
+  return { Authorization: `Bearer ${token}` };
+}
+
+/**
+ * Surfaces the server's own message. Swallowing it and showing a generic
+ * "something went wrong" would hide exactly the detail an operator needs.
+ */
+function rethrow(error: any, action: string): never {
+  const message = error?.response?.data?.message || error?.message || `${action} failed`;
+  const wrapped = new Error(message);
+  (wrapped as any).status = error?.response?.status;
+  throw wrapped;
+}
+
+export const getCameras = async (query: CameraQuery = {}) => {
+  try {
+    const response = await axios.get<{
+      success: boolean;
+      cameras: RegistryCamera[];
+      total: number;
+      skip: number;
+      take: number;
+    }>(`${API_URL}/cameras`, { params: query, headers: authHeaders() });
+    return response.data;
+  } catch (error: any) {
+    rethrow(error, 'Fetching cameras');
+  }
+};
+
+export const getCamera = async (id: string) => {
+  try {
+    const response = await axios.get<{ success: boolean; data: RegistryCamera }>(
+      `${API_URL}/cameras/${id}`,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Fetching camera');
+  }
+};
+
+export const createCamera = async (payload: CameraPayload) => {
+  try {
+    const response = await axios.post<{ success: boolean; data: RegistryCamera }>(
+      `${API_URL}/cameras`,
+      payload,
+      { headers: { ...authHeaders(), 'Content-Type': 'application/json' } }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Registering camera');
+  }
+};
+
+export const updateCamera = async (id: string, payload: Partial<CameraPayload>) => {
+  try {
+    const response = await axios.put<{ success: boolean; data: RegistryCamera }>(
+      `${API_URL}/cameras/${id}`,
+      payload,
+      { headers: { ...authHeaders(), 'Content-Type': 'application/json' } }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Updating camera');
+  }
+};
+
+export const deleteCamera = async (id: string) => {
+  try {
+    await axios.delete(`${API_URL}/cameras/${id}`, { headers: authHeaders() });
+  } catch (error: any) {
+    rethrow(error, 'Deleting camera');
+  }
+};
+
+export const getDepartments = async () => {
+  try {
+    const response = await axios.get<{ success: boolean; data: Department[] }>(
+      `${API_URL}/departments`,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Fetching departments');
+  }
+};
+
+export const getSites = async (departmentId?: string) => {
+  try {
+    const response = await axios.get<{ success: boolean; data: Site[] }>(`${API_URL}/sites`, {
+      params: departmentId ? { departmentId } : undefined,
+      headers: authHeaders(),
+    });
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Fetching sites');
+  }
+};
+
+export const getRegistryStats = async () => {
+  try {
+    const response = await axios.get<{ success: boolean; data: RegistryStats }>(`${API_URL}/stats`, {
+      headers: authHeaders(),
+    });
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Fetching registry statistics');
+  }
+};

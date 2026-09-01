@@ -2,17 +2,21 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
+// Mirrors the UserRole enum in prisma/schema.prisma, lower-cased the way the
+// auth controller signs it into the token. POLICE operates the camera registry.
+export type UserRole = 'participant' | 'organizer' | 'admin' | 'police';
+
 interface User {
   id: string;
   name: string;
   email: string;
-  role: 'participant' | 'organizer' | 'admin';
+  role: UserRole;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (email: string, password: string, role: 'participant' | 'organizer' | 'admin') => Promise<void>;
-  register: (email: string, password: string, name: string, role: 'participant' | 'organizer' | 'admin') => Promise<void>;
+  login: (email: string, password: string, role: UserRole) => Promise<void>;
+  register: (email: string, password: string, name: string, role: UserRole) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -50,7 +54,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const login = async (email: string, password: string, role: 'participant' | 'organizer' | 'admin') => {
+  const login = async (email: string, password: string, role: UserRole) => {
     try {
       const response = await fetch(`${API_URL}/auth/login`, {
         method: 'POST',
@@ -79,7 +83,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  const register = async (email: string, password: string, name: string, role: 'participant' | 'organizer' | 'admin') => {
+  const register = async (email: string, password: string, name: string, role: UserRole) => {
     try {
       const response = await fetch(`${API_URL}/auth/register`, {
         method: 'POST',

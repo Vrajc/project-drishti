@@ -19,6 +19,8 @@ import EmergencyDispatch from './pages/EmergencyDispatch';
 import AISummaries from './pages/AISummaries';
 import PostEventReports from './pages/PostEventReports';
 import AdminDashboard from './pages/AdminDashboard';
+import CameraRegistry from './pages/surveillance/CameraRegistry';
+import CameraMap from './pages/surveillance/CameraMap';
 
 const pageTransition = {
   initial: { opacity: 0, y: 20 },
@@ -67,6 +69,8 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="/ai-summaries" element={<PageWrapper><AISummaries /></PageWrapper>} />
         <Route path="/post-event-reports" element={<PageWrapper><PostEventReports /></PageWrapper>} />
         <Route path="/admin-dashboard" element={<PageWrapper><AdminDashboard /></PageWrapper>} />
+        <Route path="/surveillance/cameras" element={<PageWrapper><CameraRegistry /></PageWrapper>} />
+        <Route path="/surveillance/map" element={<PageWrapper><CameraMap /></PageWrapper>} />
       </Routes>
     </AnimatePresence>
   );

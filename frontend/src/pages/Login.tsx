@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, Mail, Lock, User, Shield, Briefcase } from 'lucide-react';
+import { useAuth, UserRole } from '../contexts/AuthContext';
+import { Eye, EyeOff, Mail, Lock, User, Shield, Briefcase, Siren } from 'lucide-react';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import ParticleHero from '../components/ParticleHero';
@@ -13,7 +13,7 @@ const Login: React.FC = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    role: 'participant' as 'participant' | 'organizer' | 'admin'
+    role: 'participant' as UserRole
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -41,6 +41,8 @@ const Login: React.FC = () => {
         navigate('/organizer-dashboard');
       } else if (formData.role === 'admin') {
         navigate('/admin-dashboard');
+      } else if (formData.role === 'police') {
+        navigate('/surveillance/cameras');
       }
     } catch (error: any) {
       setError(error.message || 'Login failed. Please check your credentials.');
@@ -114,7 +116,7 @@ const Login: React.FC = () => {
                 <label className="block text-sm font-medium text-ai-gray-300 mb-3 sm:mb-4 tracking-wide">
                   Select Role
                 </label>
-                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                   <motion.button
                     type="button"
                     initial={{ opacity: 0, y: 20 }}
@@ -193,6 +195,33 @@ const Login: React.FC = () => {
                     <div className="relative z-10 flex flex-col items-center">
                       <Shield className="w-5 h-5 sm:w-6 sm:h-6 mb-1.5 sm:mb-2" />
                       <span className="text-[11px] sm:text-xs font-medium">Admin</span>
+                    </div>
+                  </motion.button>
+
+                  <motion.button
+                    type="button"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.75, duration: 0.4 }}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setFormData({ ...formData, role: 'police' })}
+                    className={`p-2.5 sm:p-4 rounded-xl transition-all duration-300 relative overflow-hidden ${
+                      formData.role === 'police'
+                        ? 'bg-ai-white text-ai-black shadow-lg'
+                        : 'bg-ai-gray-900/50 text-ai-gray-400 hover:bg-ai-gray-800/50 border border-ai-gray-800'
+                    }`}
+                  >
+                    {formData.role === 'police' && (
+                      <motion.div
+                        layoutId="roleIndicator"
+                        className="absolute inset-0 bg-ai-white"
+                        transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                      />
+                    )}
+                    <div className="relative z-10 flex flex-col items-center">
+                      <Siren className="w-5 h-5 sm:w-6 sm:h-6 mb-1.5 sm:mb-2" />
+                      <span className="text-[11px] sm:text-xs font-medium">Police</span>
                     </div>
                   </motion.button>
                 </div>

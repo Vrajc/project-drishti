@@ -916,3 +916,120 @@ video {
     scroll-behavior: auto !important;
   }
 }
+/* ==========================================================================
+   Camera map (Leaflet)
+   OpenStreetMap raster tiles are a light-themed image, so the only way to sit
+   them in this dark UI is to invert them. Markers and popups live outside the
+   tile pane and keep their own colours.
+   ========================================================================== */
+
+.camera-map-shell .leaflet-container {
+  background: #0A0A0A;
+  font-family: inherit;
+}
+
+.camera-map-shell .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.6);
+}
+
+.camera-map-shell .leaflet-control-zoom a {
+  background: #111111;
+  color: #E6E6E6;
+  border-color: #2A2A2A;
+}
+
+.camera-map-shell .leaflet-control-zoom a:hover {
+  background: #1A1A1A;
+  color: #FFFFFF;
+}
+
+.camera-map-shell .leaflet-control-attribution {
+  background: rgba(10, 10, 10, 0.75);
+  color: #8C8C8C;
+}
+
+.camera-map-shell .leaflet-control-attribution a {
+  color: #B3B3B3;
+}
+
+/* Marker: a status-coloured dot, with an optional arrow showing the surveyed
+   bearing. No arrow is drawn when the bearing was never recorded. */
+.camera-marker-dot {
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 2px;
+  border-radius: 9999px;
+  background: var(--marker-color, #8C8C8C);
+  border: 2px solid rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 0 1px var(--marker-color, #8C8C8C);
+  position: relative;
+}
+
+.camera-marker-dot.is-selected {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+
+.camera-marker-arrow {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+
+.camera-marker-arrow::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-bottom: 7px solid var(--marker-color, #8C8C8C);
+}
+
+.camera-map-shell .leaflet-popup-content-wrapper,
+.camera-map-shell .leaflet-popup-tip {
+  background: #111111;
+  color: #E6E6E6;
+  border: 1px solid #2A2A2A;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.camera-map-shell .leaflet-popup-content {
+  margin: 12px 14px;
+  min-width: 15rem;
+}
+
+.camera-map-shell .leaflet-popup-close-button {
+  color: #8C8C8C;
+}
+
+.camera-popup-title {
+  font-weight: 700;
+  color: #FFFFFF;
+  font-size: 0.875rem;
+}
+
+.camera-popup-sub {
+  color: #B3B3B3;
+  font-size: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.camera-popup dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  font-size: 0.75rem;
+  margin: 0;
+}
+
+.camera-popup dt {
+  color: #8C8C8C;
+  white-space: nowrap;
+}
+
+.camera-popup dd {
+  color: #E6E6E6;
+  margin: 0;
+}

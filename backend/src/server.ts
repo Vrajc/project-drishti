@@ -9,6 +9,7 @@ import monitoringRoutes from './routes/monitoring.routes.js';
 import aiRoutes from './routes/ai.routes.js';
 import incidentRoutes from './routes/incident.routes.js';
 import crowdAnalysisRoutes from './routes/crowdAnalysis.routes.js';
+import surveillanceRoutes from './routes/surveillance.routes.js';
 import { listModels } from './utils/openai.service.js';
 import { seedTestUser } from './utils/seedDatabase.js';
 
@@ -55,6 +56,7 @@ app.use('/api/monitoring', monitoringRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/crowd-analysis', crowdAnalysisRoutes);
+app.use('/api/surveillance', surveillanceRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {

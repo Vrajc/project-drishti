@@ -591,3 +591,129 @@ generators were deliberately left broken rather than repaired** — a working mo
 plausible fake rows into Postgres would be far more dangerous than one that fails.
 
 Build state after Phase 0.5: `npm run build` exits 0, both `tsc --noEmit` runs exit 0.
+
+---
+
+## 8. Phase 1 — camera registry and GIS foundation
+
+Model 1 of the challenge brief: a standalone camera registry that exists independently of any
+event, with real coordinates, a map, and departments that own the estate.
+
+### Schema (migration `20260901172409_add_camera_registry`)
+
+Additive only. No column was dropped, no table recreated, no data touched. The single
+non-additive statement is `ALTER COLUMN "eventId" DROP NOT NULL`, which only widens what the
+column accepts. All 4 pre-existing cameras, 3 events, 5 zones and 10 users survived unchanged.
+
+| Change | Detail |
+|---|---|
+| `Camera.eventId` | now nullable — a registry camera belongs to no event |
+| `Camera` + 17 columns | `latitude`, `longitude`, `coverageAngle`, `coverageRadius`, `isPtz`, `vendor`, `model`, `protocol`, `onvifUrl`, `username`, `passwordEnc`, `resolution`, `fps`, `status`, `lastSeenAt`, `departmentId`, `siteId` — every one nullable or defaulted |
+| `enum CameraStatus` | `ONLINE OFFLINE DEGRADED UNKNOWN`, default `UNKNOWN` |
+| `enum UserRole` | `+ POLICE` |
+| `Department` | code (unique), name, contact fields |
+| `Site` | code (unique), address, coordinates, optional department |
+| `CameraHealth` | one row per probe: status, `latencyMs`, `fpsObserved`, `error` |
+
+**Partial unique index, added by hand to the migration.** `@@unique([eventId, cameraId])` does
+not constrain registry cameras, because Postgres treats NULLs as distinct — two registry cameras
+could both claim `GNR-001`. `cameras_registry_cameraId_key ON cameras(cameraId) WHERE eventId IS
+NULL` closes that. Prisma cannot express a partial index, so `assertCameraIdFree()` in the service
+enforces the same rule in the application, both for a readable error message and so the guarantee
+survives a deployment where the index is missing. `prisma migrate diff` reports no drift from it.
+
+### `CameraStatus` is the honesty contract
+
+Nothing except a real probe may write `ONLINE`. The seed does not set `status` or `lastSeenAt` at
+all — not on first run and not on re-run, so a re-seed cannot erase a health checker's findings.
+The API surfaces `UNKNOWN` as *"Not yet probed"* and a null `lastSeenAt` as *"Never reached"*,
+in a neutral grey rather than red: a camera nobody has contacted is not a camera that is down,
+and colouring it as a fault would be a claim the system cannot support.
+
+### What the seed is, precisely
+
+`prisma/seed-cameras.ts` — 5 departments, 16 sites, 56 cameras. Idempotent (matches on
+`cameraId` where `eventId IS NULL`).
+
+- **Real:** every coordinate. Sites are actual places — Akshardham, Mahatma Mandir, Kalupur
+  Junction, Kankaria Lakefront, Sabarmati Ashram, Narendra Modi Stadium, SG Highway, Vastrapur
+  Lake. Verified bounding box 22.9938–23.2325 N, 72.5010–72.6849 E; zero coordinates outside
+  Gujarat.
+- **Declared, not measured:** vendor, model, protocol, resolution, fps — a hardware inventory of
+  the kind a department hands over as a spreadsheet. The UI labels them *"as configured"* and the
+  registry form groups them under *"Hardware — as configured, not measured"*.
+- **Deliberately absent:** department contact names and phone numbers are left null. Inventing a
+  phone number for a real police force would be worse than an empty field.
+- **Deliberately incomplete:** 3 cameras are seeded with no coordinates. A real estate always has
+  units registered but not yet surveyed, and the map has to say so rather than drop a pin at 0,0.
+  With the 4 pre-existing event cameras, 7 of 60 are withheld from the map and listed by name
+  under *"Not on the map — awaiting survey"*.
+- `rtspUrl` is built from `MEDIAMTX_RTSP_BASE`, so the whole estate re-targets by env var.
+
+### API — `/api/surveillance`
+
+All routes authenticated. `admin` and `police` read and write; `organizer` reads only, so an
+organizer can attach a registry camera to an event without being able to alter the estate.
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/cameras` | filters `q`, `status`, `departmentId`, `siteId`, `eventId` (`none` = registry-only), `located`; `skip`/`take`, returns `{ cameras, total, skip, take }` |
+| GET | `/cameras/:id` | includes the last 20 health probes |
+| POST/PUT/DELETE | `/cameras[/:id]` | `admin`, `police` |
+| GET | `/departments`, `/sites`, `/stats` | |
+
+`passwordEnc` is stripped in `formatCamera()` and never leaves the server; the client gets
+`hasCredentials: boolean`. Credentials are AES-256-GCM encrypted under `CAMERA_CREDENTIAL_KEY`.
+**With no key configured the API refuses the write** (400, naming the missing variable) rather
+than storing a plaintext password — a silent downgrade nobody would notice until it mattered.
+
+`/stats` is entirely `COUNT` and `GROUP BY`. `lastHealthCheckAt` is null until a probe runs, and
+the tile reads *"Never run"*.
+
+### Coordinates are stored as a pair or not at all
+
+`validateCoordinatePair` rejects a half-coordinate on create *and* on partial update (it validates
+the row as it will be after the write, not just the fields sent). A camera with only a latitude
+would be plotted on the prime meridian; a wrong pin is worse than an honest "not surveyed".
+
+### Frontend
+
+`pages/surveillance/CameraRegistry.tsx` (filterable table, create/edit/delete, counts) and
+`CameraMap.tsx` (react-leaflet + OpenStreetMap). `cameraStatus.ts` holds one definition of status
+presentation so table and map cannot disagree about what a colour means.
+
+The map draws only what is stored: a status-coloured pin, an arrow at the surveyed bearing
+(omitted when the bearing is null), and — for the selected camera — a range circle plus an aim
+line whose endpoint is a great-circle computation from the stored bearing and range. **No coverage
+cone is drawn**, because the schema stores no field-of-view width and a wedge would be an invented
+number on a map.
+
+Nav gains a Surveillance section for `admin` and the new `police` role. `police@gmail.com` /
+`Test@123` is created on boot alongside the existing organizer seed user, so the role can actually
+be signed into.
+
+New env vars, both documented in `backend/.env.example`: `MEDIAMTX_RTSP_BASE`,
+`CAMERA_CREDENTIAL_KEY`.
+
+### Verified by hand against a running server
+
+Auth: police register/login round-trip returns `role: police`; `/cameras` → 401 with no token,
+403 as a participant, 200 as police; organizer GET 200 / POST 403.
+Validation, each returning a readable 400: duplicate registry `cameraId`; latitude without
+longitude (on create and on partial update); latitude 991; `protocol: "telepathy"`; unknown
+`departmentId`; password with no key configured. Rename onto an existing id rejected; delete 200
+then 404.
+Credentials: stored value is `iv:tag:ciphertext`, not the plaintext; two encryptions of the same
+secret differ; decrypt returns the original; a tampered ciphertext throws on the GCM auth tag.
+Seed: re-run reports `0 created, 56 updated`, leaving counts at 60 cameras / 16 sites / 5
+departments.
+Every new module compiles and is served by the Vite dev server (`CameraRegistry`, `CameraMap`,
+`cameraStatus`, `surveillance.service`, `Navbar`, `Login`, `Register`, `react-leaflet`,
+`leaflet.css`, all HTTP 200).
+
+**Not verified:** no visual click-through in a browser — the Chrome extension was not connected in
+this session. The pages are proven to compile and their data contracts proven end-to-end against
+the live API, but nothing here confirms how they *look*.
+
+Gate after Phase 1: still 59 occurrences, unchanged. Phase 1 introduced no new fabricated data.
+`npm run build` exits 0; both `tsc --noEmit` exit 0.
