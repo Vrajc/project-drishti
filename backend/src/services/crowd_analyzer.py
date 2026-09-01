@@ -1,6 +1,34 @@
 """
 Crowd Analysis Service using OpenCV
 Detects people in video footage and tracks crowd density per zone
+
+SUPERSEDED - kept for reference, not for new work.
+=================================================
+Live detection now happens in `ai-service/`, which runs YOLOv8 with ByteTrack
+over RTSP rather than HOG over an uploaded file. The zone logic that mattered
+has been ported to `ai-service/zones.py`, verbatim: the ray-casting test and the
+"centre of the box, first matching zone wins" counting rule are byte-for-byte
+equivalent, verified against this file over ten thousand random points and three
+hundred random scenes with zero divergence.
+
+Two behaviours here were deliberately NOT ported, because both fabricate
+geometry and then report real counts against it:
+
+  * `auto_scale_zones` rescales zones by a factor inferred from the largest
+    coordinate present, and - when several zones share coordinates - replaces
+    them outright with evenly distributed vertical strips. Occupancy counted
+    inside boundaries nobody drew is exactly the kind of number this product
+    must not produce.
+  * `process_video` invents a full-frame "Full Video" zone when an event has no
+    zones, so an event with no geometry still returns confident occupancy.
+
+The replacement states the reference canvas explicitly and returns an empty
+occupancy map when it cannot be known. See the module docstring in
+`ai-service/zones.py`.
+
+This file is still reachable through the /api/crowd-analysis upload route.
+Phase 4 replaces that route's data source; until then, nothing new should be
+built on this class.
 """
 
 import cv2

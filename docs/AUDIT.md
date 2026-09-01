@@ -865,3 +865,128 @@ be served by Vite.
 
 Gate after Phase 2: still 59 occurrences, unchanged. `npm run build` exits 0; both `tsc --noEmit`
 exit 0.
+
+---
+
+## 10. Phase 3 — the analytics engine
+
+`ai-service/` at the repo root. Every detection in the product is produced here,
+and nothing in it invents one.
+
+### The zone logic is a verified port, not a rewrite
+
+`ai-service/zones.py` carries the ray-casting test and the counting rule across
+from `backend/src/services/crowd_analyzer.py`. Equivalence was measured, not
+asserted: 10,000 random points against 400 random polygons, and 300 random
+scenes of up to 30 boxes against up to 4 zones, run through both
+implementations. **Zero divergence on both.**
+
+Getting there found one real difference. The original computes a box centre with
+integer floor division (`x + w // 2`), and my first version used `/ 2` — 8 of
+300 scenes disagreed, always on a box straddling a zone edge. The quirk is now
+preserved deliberately, because two systems that count the same crowd *nearly*
+the same are worse than two that count it identically.
+
+**Two behaviours were deliberately not ported.** `auto_scale_zones` rescales
+zones by a factor inferred from the largest coordinate present and — when
+several zones share coordinates — replaces them outright with evenly distributed
+vertical strips. `process_video` invents a full-frame "Full Video" zone for an
+event with no zones. Both produce a real count of real people inside boundaries
+nobody drew, reported as though an operator had defined them.
+
+The replacement requires the caller to state the canvas the polygons were drawn
+on (`zoneReferenceSize`). Without it, `occupancy()` returns `{}` and the worker
+publishes `zoneOccupancy: {}` — the honest "we cannot place these boxes". The
+old file keeps a header pointing here and saying why.
+
+### The event contract
+
+Verified to match the specified shape exactly: the nine top-level keys and the
+four attribute keys, no more and no fewer. A detection with nothing measured
+carries `trackId: null`, `snapshotPath: null`, `zoneOccupancy: {}`, and all four
+attributes null — never an empty string or a plausible default, so a consumer
+can treat a present value as something actually observed.
+
+`zoneOccupancy` is keyed by Zone **UUID**, not the human-facing `zoneId` — the
+same identity mistake that broke crowd density before Phase 0.5.
+
+### What the service refuses to do
+
+| Missing | Behaviour |
+|---|---|
+| ultralytics or weights | `available: false`, `/health` 503 with the reason, worker refuses to start. `detect()` **raises** rather than returning `[]`, so "no detector" can never be read as "empty frame" |
+| `PLATE_MODEL_PATH` | plate reading off, `plateText` null on every vehicle, reason on `/health` |
+| `zoneReferenceSize` | `zoneOccupancy: {}` rather than a count against a guessed scale |
+| readable frames | DEGRADED with the reason, backoff retry, gap left genuinely empty |
+| Redis | publish fails, counted as `dropped` on `/health`, no silent buffering |
+
+The plate refusal is the one worth restating. The obvious shortcut with no plate
+detector is to OCR the lower third of every vehicle box; it reliably produces
+confident, well-formed, entirely wrong registration numbers, and a plate is the
+single field a person would act on.
+
+`fpsObserved` is null everywhere in this phase's output until frames are decoded
+— it is measured from the decoder over a rolling window, never the camera's
+configured fps.
+
+`color` **is** published, because it is a measurement: the centre half of the
+crop (edges are mostly background) converted to HSV, achromatic cases resolved
+by saturation and value, then the modal hue named. Verified against solid-colour
+images for white, black, grey, red, blue, green, yellow and orange, and against
+a grey-bordered red box to confirm the centre wins. `vehicleType` is the
+detector's own class — "car", not "sedan", because nothing here can tell a sedan
+from a hatchback.
+
+### Track identity
+
+ByteTrack runs inside `model.track(persist=True)`, so state lives on the model
+instance and each camera gets its own — sharing one would braid tracks together
+and hand out ids that teleport between locations. After a reconnect the tracker
+is reset and `generation` increments: frames either side of a gap are not
+continuous, so a track cannot honestly be carried across it, and two detections
+sharing a track id in different generations are not the same object.
+
+### A measured finding about stream opens
+
+`cv2.VideoCapture` on an unreachable RTSP URL blocks for a **flat 30 seconds**,
+and no `OPENCV_FFMPEG_CAPTURE_OPTIONS` timeout changes it. Measured across five
+option sets (`timeout`, `stimeout`, both, `max_delay`, none): 30.05–30.12s every
+time. A thread stuck in C cannot be cancelled, so fifty down cameras would have
+occupied asyncio's shared pool and starved the frame reads of every healthy one.
+
+Fixed with a TCP pre-check before FFmpeg is involved — a refused port is known
+in milliseconds with the real errno — plus a dedicated capture-open pool so a
+stuck open cannot delay another camera. Verified: the worker now reports
+DEGRADED with `No connection could be made because the target machine actively
+refused it` almost immediately, and stays DEGRADED across retries rather than
+flapping back to STARTING.
+
+### Verified by hand
+
+Zone equivalence as above. Contract shape and null discipline. Worker config
+parsing, including a bad `frameStride` falling back to the default and a missing
+`zoneReferenceSize` disabling occupancy. Colour naming across eight solid
+colours and a background-dominated crop. The full worker failure path against a
+genuinely refused port: DEGRADED published with the errno, exponential backoff,
+**zero detections published during the outage**, `fpsObserved` null, zero frames
+processed. A worker with no stream URL and a worker with no detector both reach
+FAILED with the reason rather than sitting silent. All eight API routes register
+and the app imports cleanly.
+
+**Not verified.** `torch` and `ultralytics` were not installed — the CUDA wheels
+are around 2GB and, more to the point, there is no footage on this machine
+containing people, vehicles or plates, so installing them would have proved only
+that a model loads. **No YOLO inference, no ByteTrack association and no OCR was
+run.** The done-condition — a worker publishing real detections within 5s, and
+plates read correctly ≥70% of the time — is therefore **unverified**, and needs
+`docker compose up -d ai-service` with real footage in `media/clips/`. Redis was
+also unavailable, so publishing was verified only through its failure path (the
+`dropped` counter incrementing, and the connect error being reported verbatim).
+
+Everything not requiring weights was exercised against real code paths, not
+stubs, with one exception: the stream-failure test substitutes a stub detector,
+because the real one refuses to start without weights and would otherwise
+short-circuit the very path under test.
+
+Gate after Phase 3: unchanged at 59 for files this phase touched; `ai-service/`
+contributes none.

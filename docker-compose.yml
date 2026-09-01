@@ -70,8 +70,39 @@ services:
       retries: 5
       start_period: 20s
 
+  # The analytics engine. Every detection in the product is produced here.
+  ai-service:
+    build: ./ai-service
+    container_name: drishti-ai
+    restart: unless-stopped
+    ports:
+      - "${AI_SERVICE_PORT:-8100}:8100"
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379
+      YOLO_MODEL: ${YOLO_MODEL:-yolov8n.pt}
+      YOLO_DEVICE: ${YOLO_DEVICE:-cpu}
+      FRAME_STRIDE: ${FRAME_STRIDE:-3}
+      SNAPSHOT_DIR: /snapshots
+      # Unset by default. Plate reading stays off until a real detector is
+      # supplied - it never guesses where a plate is.
+      PLATE_MODEL_PATH: ${PLATE_MODEL_PATH:-}
+    volumes:
+      # Weights are downloaded on first use and kept, never baked into the image
+      # and never committed.
+      - ai_models:/models
+      - ai_snapshots:/snapshots
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - drishti-network
+
 volumes:
   postgres_data:
+    driver: local
+  ai_models:
+    driver: local
+  ai_snapshots:
     driver: local
   redis_data:
     driver: local

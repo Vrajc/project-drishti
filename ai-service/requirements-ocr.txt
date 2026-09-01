@@ -1,0 +1,10 @@
+# Optional. Install alongside requirements.txt only when plate reading is wanted,
+# and only with a real plate detector in PLATE_MODEL_PATH - without one, plate
+# reading stays off no matter what is installed.
+-r requirements.txt
+
+paddleocr==2.9.1
+paddlepaddle==2.6.2
+
+# Fallback, tried when PaddleOCR cannot load.
+easyocr==1.7.2

@@ -1,0 +1,27 @@
+# Pinned so a rebuild the night before an evaluation cannot pull a new major.
+
+# --- API ---
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+
+# --- Detection and tracking ---
+# ultralytics brings ByteTrack with it; model.track(persist=True) is the tracker.
+ultralytics==8.3.40
+# The CPU build. Fifty streams on one machine is a throughput problem, not a
+# per-frame latency one, and the CUDA wheels are ~2GB. Install the CUDA build
+# yourself if the evaluation machine has a GPU.
+torch==2.5.1
+torchvision==0.20.1
+
+# --- Video and imaging ---
+opencv-python-headless==4.10.0.84
+numpy==1.26.4
+
+# --- Publishing ---
+redis==5.2.1
+
+# --- Plate OCR ---
+# Only reached when PLATE_MODEL_PATH is set. PaddleOCR is the first choice and
+# EasyOCR the fallback; both are heavy, so they are optional extras rather than
+# hard requirements - see requirements-ocr.txt.
