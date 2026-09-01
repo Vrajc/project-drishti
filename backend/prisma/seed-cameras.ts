@@ -25,6 +25,9 @@
  */
 
 import 'dotenv/config';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -225,13 +228,58 @@ function ipForIndex(index: number): string {
   return `10.42.${Math.floor(index / 64) + 1}.${(index % 64) + 10}`;
 }
 
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const STREAM_MANIFEST = path.join(REPO_ROOT, 'docker', 'streams.json');
+
+/**
+ * scripts/generate-streams.js writes docker/streams.json when it builds the MediaMTX
+ * configuration. Reading it here is what keeps the registry and the stream server in
+ * agreement: the generator is the single direction of truth, clips -> config -> seed.
+ *
+ * Without the manifest the seed falls back to the cam01..camNN convention the generator
+ * also uses, so a fresh clone still produces sensible URLs - they simply will not resolve
+ * to anything until someone adds clips and generates the config.
+ */
+function loadStreamPaths(): { paths: string[] | null; source: string } {
+  if (!fs.existsSync(STREAM_MANIFEST)) {
+    return { paths: null, source: 'no manifest - using the cam01..camNN convention' };
+  }
+
+  try {
+    const manifest = JSON.parse(fs.readFileSync(STREAM_MANIFEST, 'utf8'));
+    const paths = (manifest.streams || []).map((entry: any) => entry.path).filter(Boolean);
+    if (paths.length === 0) {
+      return { paths: null, source: 'manifest lists no streams - using the convention' };
+    }
+    return {
+      paths,
+      source: `docker/streams.json (${paths.length} path(s), ${manifest.clipCount} clip(s))`,
+    };
+  } catch (error: any) {
+    // A corrupt manifest must not silently produce a registry pointing at the wrong
+    // streams. Fail loudly instead.
+    throw new Error(`docker/streams.json could not be read: ${error.message}`);
+  }
+}
+
 /** Stream path on MediaMTX: cam01 .. camNN, matching the publisher configuration. */
-function streamPath(index: number): string {
+function conventionalStreamPath(index: number): string {
   return `cam${String(index + 1).padStart(2, '0')}`;
 }
 
 async function main() {
+  const { paths: manifestPaths, source: manifestSource } = loadStreamPaths();
+
   console.log(`Seeding camera registry. Stream base: ${RTSP_BASE}`);
+  console.log(`  stream paths from: ${manifestSource}`);
+
+  if (manifestPaths && manifestPaths.length < CAMERAS.length) {
+    console.warn(
+      `  ⚠ the manifest has ${manifestPaths.length} path(s) for ${CAMERAS.length} cameras. ` +
+        `The last ${CAMERAS.length - manifestPaths.length} will point at a stream that does ` +
+        `not exist and will probe OFFLINE. Regenerate with --count ${CAMERAS.length}.`
+    );
+  }
 
   // --- Departments ---
   const departmentIds = new Map<string, string>();
@@ -286,13 +334,13 @@ async function main() {
     if (!hardware) throw new Error(`Camera ${cam.cameraId} names unknown hardware index ${cam.hw}`);
 
     const ipAddress = ipForIndex(index);
-    const path = streamPath(index);
+    const streamName = manifestPaths?.[index] ?? conventionalStreamPath(index);
 
     const data = {
       name: cam.name,
       location: `${site.name}, ${site.address.split(', ').pop()}`,
       ipAddress,
-      rtspUrl: `${RTSP_BASE}/${path}`,
+      rtspUrl: `${RTSP_BASE}/${streamName}`,
       latitude: cam.latitude,
       longitude: cam.longitude,
       coverageAngle: cam.bearing,

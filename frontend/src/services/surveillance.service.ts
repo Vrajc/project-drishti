@@ -245,3 +245,91 @@ export const getRegistryStats = async () => {
     rethrow(error, 'Fetching registry statistics');
   }
 };
+
+// ---------------------------------------------------------------------------
+// Stream playback and health probing (Phase 2)
+// ---------------------------------------------------------------------------
+
+export interface StreamEndpoints {
+  cameraId: string;
+  name: string;
+  status: CameraStatus;
+  lastSeenAt: string | null;
+  rtspUrl: string;
+  /** False when the server cannot honestly offer a browser-playable URL. */
+  playable: boolean;
+  hlsUrl: string | null;
+  webrtcUrl: string | null;
+  /** Why it is not playable. Null when it is. */
+  reason: string | null;
+}
+
+export interface SweepSummary {
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  probed: number;
+  skipped: number;
+  byStatus: Record<string, number>;
+  changed: Array<{ cameraId: string; from: CameraStatus; to: CameraStatus; reason: string | null }>;
+  prunedHealthRows: number;
+}
+
+export interface HealthPollerStatus {
+  enabled: boolean;
+  intervalSeconds: number;
+  timeoutMs: number;
+  concurrency: number;
+  retentionHours: number;
+  /** Null until this server process has finished a sweep; a restart clears it. */
+  lastSweep: SweepSummary | null;
+}
+
+export const getCameraStream = async (id: string) => {
+  try {
+    const response = await axios.get<{ success: boolean; data: StreamEndpoints }>(
+      `${API_URL}/cameras/${id}/stream`,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Resolving stream URL');
+  }
+};
+
+export const getHealthStatus = async () => {
+  try {
+    const response = await axios.get<{ success: boolean; data: HealthPollerStatus }>(
+      `${API_URL}/health`,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Reading health poller status');
+  }
+};
+
+export const runHealthCheck = async () => {
+  try {
+    const response = await axios.post<{ success: boolean; data: SweepSummary }>(
+      `${API_URL}/health-check`,
+      {},
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Running a health sweep');
+  }
+};
+
+export const runCameraHealthCheck = async (id: string) => {
+  try {
+    const response = await axios.post<{
+      success: boolean;
+      data: { camera: RegistryCamera; sweep: SweepSummary };
+    }>(`${API_URL}/cameras/${id}/health-check`, {}, { headers: authHeaders() });
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Probing camera');
+  }
+};

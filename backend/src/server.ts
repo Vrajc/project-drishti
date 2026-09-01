@@ -12,6 +12,7 @@ import crowdAnalysisRoutes from './routes/crowdAnalysis.routes.js';
 import surveillanceRoutes from './routes/surveillance.routes.js';
 import { listModels } from './utils/openai.service.js';
 import { seedTestUser } from './utils/seedDatabase.js';
+import { startHealthPoller } from './services/cameraHealth.service.js';
 
 // Load environment variables
 dotenv.config();
@@ -75,6 +76,9 @@ const startServer = async () => {
     try {
       await connectDatabase();
       await seedTestUser();
+      // Only started once the database is reachable - a poller that cannot
+      // record what it found is worse than no poller.
+      startHealthPoller();
     } catch (dbError) {
       if (requiresDatabase) {
         console.error('❌ Prisma Postgres connection failed in production.');

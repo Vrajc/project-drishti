@@ -17,6 +17,7 @@
     "typecheck:backend": "cd backend && npx tsc --noEmit",
     "typecheck:frontend": "cd frontend && npx tsc --noEmit",
     "check:no-mocks": "node scripts/run-sh.mjs scripts/check-no-mocks.sh",
+    "streams:generate": "node scripts/generate-streams.js",
     "clean": "rimraf frontend/node_modules frontend/dist backend/node_modules backend/dist"
   },
   "keywords": [
@@ -32,5 +33,6 @@
     "concurrently": "^8.2.2",
     "prisma": "^6.19.3",
     "rimraf": "^5.0.5"
-  }
+  },
+  "type": "module"
 }

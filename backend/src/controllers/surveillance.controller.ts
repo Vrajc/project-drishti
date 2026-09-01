@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import * as surveillance from '../services/surveillance.service.js';
 import { ValidationError } from '../services/surveillance.service.js';
+import { runHealthSweep, getLastSweepSummary, config as healthConfig } from '../services/cameraHealth.service.js';
 
 // Follows the envelope the rest of the API already uses: { success, data } or
 // { success: false, message }.
@@ -126,5 +127,71 @@ export const getStats = async (_req: Request, res: Response) => {
     res.status(200).json({ success: true, data: await surveillance.getRegistryStats() });
   } catch (error: any) {
     fail(res, error, 'Failed to fetch registry statistics');
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Stream playback and health
+// ---------------------------------------------------------------------------
+
+export const getCameraStreamEndpoints = async (req: Request, res: Response) => {
+  try {
+    const stream = await surveillance.getCameraStream(req.params.id);
+    if (!stream) {
+      return res.status(404).json({ success: false, message: 'Camera not found' });
+    }
+    res.status(200).json({ success: true, data: stream });
+  } catch (error: any) {
+    fail(res, error, 'Failed to resolve stream URLs');
+  }
+};
+
+/**
+ * Probes every camera now rather than waiting for the next tick. The response
+ * carries the real sweep summary, including which cameras changed state and
+ * why, so an operator can see the effect of pulling a stream immediately.
+ */
+export const runHealthCheck = async (_req: Request, res: Response) => {
+  try {
+    const summary = await runHealthSweep();
+    res.status(200).json({ success: true, data: summary });
+  } catch (error: any) {
+    fail(res, error, 'Health sweep failed');
+  }
+};
+
+export const runCameraHealthCheck = async (req: Request, res: Response) => {
+  try {
+    const camera = await surveillance.getCameraById(req.params.id);
+    if (!camera) {
+      return res.status(404).json({ success: false, message: 'Camera not found' });
+    }
+
+    const summary = await runHealthSweep([req.params.id]);
+    const updated = await surveillance.getCameraById(req.params.id);
+
+    res.status(200).json({ success: true, data: { camera: updated, sweep: summary } });
+  } catch (error: any) {
+    fail(res, error, 'Health check failed');
+  }
+};
+
+export const getHealthStatus = async (_req: Request, res: Response) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: {
+        enabled: healthConfig.enabled,
+        intervalSeconds: Math.round(healthConfig.intervalMs / 1000),
+        timeoutMs: healthConfig.timeoutMs,
+        concurrency: healthConfig.concurrency,
+        retentionHours: healthConfig.retentionHours,
+        // Null until this process has completed a sweep. It is not a claim that
+        // no sweep has ever run - a restart clears it.
+        lastSweep: getLastSweepSummary(),
+      },
+    });
+  } catch (error: any) {
+    fail(res, error, 'Failed to read health poller status');
   }
 };

@@ -1,0 +1,43 @@
+# GENERATED FILE - do not edit by hand.
+# Written by scripts/generate-streams.js at 2026-09-01T18:18:08.660Z
+# Regenerate with:  npm run streams:generate
+#
+# 0 path(s), sourced from 0 clip(s) in media/clips/.
+# Each path loops its clip forever, so a handful of files behave like a wall of cameras.
+
+logLevel: info
+logDestinations: [stdout]
+
+# Read timeouts are generous because a looping ffmpeg publisher briefly stalls at the seam.
+readTimeout: 15s
+writeTimeout: 15s
+
+rtsp: yes
+rtspAddress: :8554
+rtspTransports: [tcp, udp]
+
+# HLS is what the browser plays. It is remuxed on demand rather than always, so idle paths
+# cost nothing - the health poller probes over RTSP and never triggers a remux.
+hls: yes
+hlsAddress: :8888
+hlsAlwaysRemux: no
+hlsVariant: lowLatency
+hlsSegmentCount: 7
+hlsSegmentDuration: 1s
+hlsAllowOrigin: '*'
+
+# WebRTC is the lower-latency alternative for the expanded single-camera view.
+webrtc: yes
+webrtcAddress: :8889
+webrtcAllowOrigin: '*'
+webrtcLocalUDPAddress: :8189
+
+# Control API, used to inspect what is actually publishing.
+api: yes
+apiAddress: :9997
+
+paths:
+  # No clips were found in media/clips/, so no paths were written.
+  # Add MP4 files there and run `npm run streams:generate` again.
+  # MediaMTX will start and serve nothing; every camera will probe OFFLINE, which is
+  # the honest result - there is genuinely no stream behind them.

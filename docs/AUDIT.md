@@ -717,3 +717,151 @@ the live API, but nothing here confirms how they *look*.
 
 Gate after Phase 1: still 59 occurrences, unchanged. Phase 1 introduced no new fabricated data.
 `npm run build` exits 0; both `tsc --noEmit` exit 0.
+
+---
+
+## 9. Phase 2 — live stream layer and the health poller
+
+Phase 1 gave every camera a status of `UNKNOWN`. This phase builds the only thing allowed to
+change that: a poller that opens a socket and speaks the protocol.
+
+### MediaMTX, and how fifty endpoints come from three clips
+
+`docker-compose.yml` gains a `mediamtx` service on the existing `drishti-network`, publishing
+RTSP 8554, HLS 8888, WebRTC 8889 / 8189-udp and the control API on 9997 — every port overridable
+by env var. It mounts two things: `docker/mediamtx.yml` and `media/clips/`.
+
+`scripts/generate-streams.js` scans the clip folder and assigns clips round-robin across N
+endpoints, writing:
+
+- `docker/mediamtx.yml` — one path per camera, each with an ffmpeg publisher looping its clip
+  (`-re -stream_loop -1`). Stream-copy by default, because fifty simultaneous H.264 encodes do
+  not fit on a laptop; `--reencode` when the source codec cannot be passed through.
+- `docker/streams.json` — the manifest `seed-cameras.ts` reads, so the registry and the stream
+  server cannot disagree about which path is which. The direction of truth is one-way:
+  clips → config + manifest → camera seed.
+
+**The generator refuses to run against an empty clip folder.** Writing a config that points at
+files which do not exist would start MediaMTX, fail every publisher, and surface only as fifty
+cameras mysteriously OFFLINE. `--allow-empty` produces the paths-free config that is committed as
+the baseline — clips are never committed, so a fresh clone genuinely has no streams, and the
+config says so in a comment rather than pretending.
+
+### The probe is a real conversation, not a ping
+
+`backend/src/utils/streamProbe.ts` opens a TCP socket and sends `OPTIONS`, then `DESCRIBE`.
+
+Both matter. MediaMTX answers OPTIONS happily for a path with no publisher, so a probe that
+stopped at OPTIONS would report every dead camera as healthy. DESCRIBE is what distinguishes
+"the server is up" from "this camera is up".
+
+| Outcome | Status | Recorded reason |
+|---|---|---|
+| DESCRIBE 200 with an SDP body | ONLINE | — |
+| DESCRIBE 404 | OFFLINE | `<host> is reachable, but nothing is publishing to "/camNN"` |
+| 401, no credential stored | DEGRADED | names the missing credential |
+| 401, credential rejected | DEGRADED | `The stored credential was rejected by the camera` |
+| Connection refused / no route / unresolvable | OFFLINE | the errno, in words |
+| Connects but never answers | OFFLINE | `No RTSP response within <n>ms` |
+| Other 4xx / 5xx | DEGRADED | the verbatim status line |
+
+RFC 2617 digest auth is implemented (basic as a fallback), which is what finally gives Phase 1's
+`passwordEnc` a consumer. Credentials embedded in a URL are honoured too. HTTP endpoints get an
+HTTP probe with the response destroyed after headers, because pulling the body of an MJPEG stream
+never finishes.
+
+**`fpsObserved` is left null on every row.** This probe does not decode video, and only a decoder
+can honestly report a frame rate. It is filled by the stream workers in Phase 3.
+
+### The poller
+
+`cameraHealth.service.ts` sweeps every camera with a stream URL every 30s (all knobs are env
+vars). A camera with no stream URL is **not probed and gets no health row** — it stays `UNKNOWN`,
+which is the truthful answer to "is it up?" when nobody has ever asked. A `CameraHealth` row
+therefore always means a probe actually happened.
+
+`lastSeenAt` moves only on ONLINE. It means "last time we actually reached this camera", not
+"last time we looked", so a camera that goes down keeps the timestamp of its last real contact.
+
+Overlapping sweeps are skipped rather than stacked, and a sweep that overruns its interval logs
+which of the three env vars to change.
+
+**A real performance finding.** The first implementation wrote one row and one update per camera,
+and a sweep took 25,470ms. The probes were not the problem — measured at 9–23ms each, 944ms for
+all 56. The cost was 56 sequential transactions against a hosted Postgres at roughly 450ms per
+round trip. Batching to one `createMany` plus one `updateMany` per distinct status brought the
+same sweep to **1,481ms**, a 17× reduction. The batch insert falls back to row-by-row if a camera
+is deleted mid-sweep, so one missing row cannot lose 55 good probes.
+
+Health rows are pruned to `CAMERA_HEALTH_RETENTION_HOURS` (24 by default); at 56 cameras every
+30s the table would otherwise grow by roughly 161k rows a day.
+
+### API
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/cameras/:id/stream` | HLS and WebRTC URLs, or `playable: false` with the reason |
+| POST | `/health-check` | sweep everything now, returns the real summary |
+| POST | `/cameras/:id/health-check` | probe one camera now |
+| GET | `/health` | poller configuration and the last sweep this process ran |
+
+`/cameras/:id/stream` **only offers a browser URL when the camera's RTSP URL points at the
+configured stream server**, because only then does republishing exist. For any other host it
+returns `playable: false` and explains, rather than composing a URL that would quietly 404 inside
+a video element.
+
+### LiveWall
+
+`pages/surveillance/LiveWall.tsx` — a 5×5 grid, hls.js with native-HLS fallback, click to expand.
+
+The page distinguishes two different truths and shows both: the **LIVE** badge means pixels are
+arriving *now*, observed from the video element's own playing / waiting / error events, while the
+status pill is what the last probe found. The header count — "N of M tiles on this page are
+playing now" — is derived from that observed state, not from how many tiles were asked to play.
+
+A tile that cannot play shows the actual reason, including hls.js's own error type and detail,
+rather than a black rectangle. The wall also lists every state change from the last sweep, by
+camera and with the reason, which is the visible proof that pulling a stream really did flip a
+camera.
+
+### Verified by hand, end to end
+
+The done-condition, demonstrated without a manual trigger:
+
+```
+nothing listening on 8554   -> 56 probed, 56 OFFLINE  (4 without a URL, not probed)
+stream server started       -> 56 probed, 56 ONLINE   56 state changes recorded
+cam07 pulled at 23:42:11    -> automatic sweep at 23:42:21, ten seconds, well inside 60s:
+    GNR-007: ONLINE -> OFFLINE
+      localhost:8554 is reachable, but nothing is publishing to "/cam07"
+    lastSeenAt frozen at 18:11:49, the last time it was genuinely reached
+cam07 restored              -> GNR-007: OFFLINE -> ONLINE, lastSeenAt advances to 18:12:57
+```
+
+Probe classification was exercised against a socket-level RTSP server covering all thirteen
+cases: publishing, server-up-path-dead, auth required with no credential, with the right
+credential, with the wrong password, credentials in the URL, nothing listening,
+connects-then-silent, unresolvable host, empty URL, unsupported scheme, and a dead HTTP endpoint.
+Every one produced the intended status and a usable reason.
+
+Stream URLs: a MediaMTX-hosted camera returns HLS and WebRTC URLs; a camera pointed at
+198.51.100.7 returns `playable: false` naming the mismatch; a legacy event camera with no URL
+returns `playable: false` saying so. All 953 health rows carry `fpsObserved: null`.
+
+Seed idempotency and the manifest fallback both hold: with a manifest the seed uses its paths,
+without one it falls back to the convention, and either way the 56 registry cameras keep 56
+distinct URLs.
+
+**Not verified, and it matters.** Docker's daemon was not running in this session, so **MediaMTX
+itself was never started**. The probe, poller, state transitions and API were verified against a
+socket-level RTSP server written for the purpose, which answers OPTIONS and DESCRIBE the way
+MediaMTX does — that exercises all of the code in this repository, but none of MediaMTX's own
+configuration. Specifically unverified: that `docker/mediamtx.yml` is accepted by MediaMTX, that
+the ffmpeg publishers loop correctly, that HLS republishing works, and that twenty-five tiles
+play simultaneously in a browser. Those need `docker compose up -d mediamtx` with real clips in
+`media/clips/`, and should be run before the evaluation. The Chrome extension was also not
+connected, so again there was no visual click-through; every new module is proven to compile and
+be served by Vite.
+
+Gate after Phase 2: still 59 occurrences, unchanged. `npm run build` exits 0; both `tsc --noEmit`
+exit 0.

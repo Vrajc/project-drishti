@@ -61,12 +61,14 @@ const Navbar: React.FC = () => {
         return [
           { label: 'Dashboard', path: '/admin-dashboard' },
           { label: 'Camera Registry', path: '/surveillance/cameras' },
-          { label: 'Camera Map', path: '/surveillance/map' }
+          { label: 'Camera Map', path: '/surveillance/map' },
+          { label: 'Live Wall', path: '/surveillance/live-wall' }
         ];
       case 'police':
         return [
           { label: 'Camera Registry', path: '/surveillance/cameras' },
-          { label: 'Camera Map', path: '/surveillance/map' }
+          { label: 'Camera Map', path: '/surveillance/map' },
+          { label: 'Live Wall', path: '/surveillance/live-wall' }
         ];
       default:
         return [];

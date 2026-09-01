@@ -502,3 +502,112 @@ export async function getRegistryStats() {
     lastHealthCheckAt: lastCheck?.checkedAt ?? null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Playable stream URLs
+// ---------------------------------------------------------------------------
+
+// A browser cannot play RTSP. MediaMTX republishes each path as HLS and WebRTC,
+// and these are the bases those are served from.
+const streamBases = () => ({
+  rtsp: (process.env.MEDIAMTX_RTSP_BASE || 'rtsp://localhost:8554').replace(/\/+$/, ''),
+  hls: (process.env.MEDIAMTX_HLS_BASE || 'http://localhost:8888').replace(/\/+$/, ''),
+  webrtc: (process.env.MEDIAMTX_WEBRTC_BASE || 'http://localhost:8889').replace(/\/+$/, ''),
+});
+
+function hostOf(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    return `${parsed.hostname}:${parsed.port || '554'}`;
+  } catch {
+    return null;
+  }
+}
+
+export interface StreamEndpoints {
+  cameraId: string;
+  name: string;
+  status: CameraStatus;
+  lastSeenAt: Date | null;
+  rtspUrl: string;
+  /** False whenever the server cannot honestly offer a browser-playable URL. */
+  playable: boolean;
+  hlsUrl: string | null;
+  webrtcUrl: string | null;
+  /** Why it is not playable. Null when it is. */
+  reason: string | null;
+}
+
+/**
+ * Resolves the URLs a browser can actually open for a camera.
+ *
+ * The HLS and WebRTC URLs are only offered when the camera's RTSP URL points at
+ * the configured stream server, because only then does republishing exist. For
+ * any other host the endpoint says so instead of composing a URL that would
+ * quietly 404 in a video element.
+ */
+export async function getCameraStream(id: string): Promise<StreamEndpoints | null> {
+  const camera = await prisma.camera.findUnique({
+    where: { id },
+    select: {
+      cameraId: true,
+      name: true,
+      status: true,
+      lastSeenAt: true,
+      rtspUrl: true,
+    },
+  });
+
+  if (!camera) return null;
+
+  const bases = streamBases();
+  const base = {
+    cameraId: camera.cameraId,
+    name: camera.name,
+    status: camera.status,
+    lastSeenAt: camera.lastSeenAt,
+    rtspUrl: camera.rtspUrl,
+    hlsUrl: null,
+    webrtcUrl: null,
+  };
+
+  const rtspUrl = (camera.rtspUrl || '').trim();
+  if (rtspUrl === '') {
+    return {
+      ...base,
+      playable: false,
+      reason: 'No stream URL is configured for this camera.',
+    };
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(rtspUrl);
+  } catch {
+    return { ...base, playable: false, reason: `"${rtspUrl}" is not a valid stream URL.` };
+  }
+
+  if (hostOf(rtspUrl) !== hostOf(bases.rtsp)) {
+    return {
+      ...base,
+      playable: false,
+      reason:
+        `This camera streams from ${parsed.host}, which is not the configured stream server ` +
+        `(${new URL(bases.rtsp).host}). Only cameras published through that server can be ` +
+        'replayed in a browser.',
+    };
+  }
+
+  const path = parsed.pathname.replace(/^\/+/, '');
+  if (path === '') {
+    return { ...base, playable: false, reason: 'The stream URL names no path on the server.' };
+  }
+
+  return {
+    ...base,
+    playable: true,
+    hlsUrl: `${bases.hls}/${path}/index.m3u8`,
+    webrtcUrl: `${bases.webrtc}/${path}`,
+    reason: null,
+  };
+}
