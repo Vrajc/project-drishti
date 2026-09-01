@@ -128,7 +128,7 @@ const PostEventReports: React.FC = () => {
         incidents: eventData.incidents,
         safetyScore: eventData.safetyScore,
         responseTime: eventData.responseTime,
-        zones: event?.zones || []
+        zones: (event?.zones ?? []).map(z => z.name)
       });
 
       // Prepare data for PDF generation

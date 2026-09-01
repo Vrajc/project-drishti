@@ -17,8 +17,11 @@ interface Incident {
   description: string;
   location: string;
   timestamp: Date;
+  /** users.id of the reporter — an identifier, not a display value. */
   reporter: string;
   reporterEmail?: string;
+  /** Joined display name from the server, or null if the user record has gone. */
+  reporterName: string | null;
   status: 'open' | 'investigating' | 'resolved';
   responseTime?: number;
   resolvedAt?: Date;
@@ -116,17 +119,36 @@ const LiveMonitoring: React.FC = () => {
     console.log('===========================');
   }, [user?.role, userEvents.length, liveEvent?.id]);
 
+  const openIncidentCount = incidents.filter(i => i.status !== 'resolved').length;
+
+  // Mean response time over incidents this event has actually resolved. Was a literal 3.2
+  // for any live event; null now means "nothing resolved yet" and renders as N/A.
+  const resolvedResponseTimes = incidents
+    .filter(i => i.status === 'resolved' && typeof i.responseTime === 'number')
+    .map(i => i.responseTime as number);
+
+  const meanResponseMinutes = resolvedResponseTimes.length > 0
+    ? resolvedResponseTimes.reduce((a, b) => a + b, 0) / resolvedResponseTimes.length / 60
+    : null;
+
   // Calculate real stats from event data
   const stats = {
     eventName: liveEvent?.name || 'No Live Event',
-    safetyStatus: liveEvent ? 'OPTIMAL' : 'NO DATA',
-    activeIncidents: incidents.filter(i => i.status !== 'resolved').length,
+    // Was a fixed 'OPTIMAL' for every live event regardless of what was happening.
+    // This is a statement about open incidents and says only what it can back up.
+    safetyStatus: !liveEvent
+      ? 'NO DATA'
+      : openIncidentCount === 0
+        ? 'NO OPEN INCIDENTS'
+        : openIncidentCount >= 5
+          ? 'ALERT'
+          : 'CAUTION',
+    activeIncidents: openIncidentCount,
     crowdLevel: avgCrowdDensity > 0 ? avgCrowdDensity.toString() : '0',
     emergencyUnits: liveEvent?.dispatchUnits?.length || 0,
-    responseTime: liveEvent ? 3.2 : 0,
+    responseTime: meanResponseMinutes,
     cameras: liveEvent?.cameras?.length || 0,
     zones: liveEvent?.zones?.length || 0,
-    safetyScore: liveEvent ? Math.max(0, 100 - (incidents.filter(i => i.status !== 'resolved').length * 5)) : 0,
     crowdDensity: avgCrowdDensity
   };
 
@@ -137,7 +159,9 @@ const LiveMonitoring: React.FC = () => {
     general: { label: 'General Incident', color: 'bg-ai-gray-600/20', icon: '📋' }
   };
 
-  const zones = liveEvent?.zones || ['Main Area'];
+  // No fallback zone: an event with none configured shows an empty state rather than
+  // a fictional 'Main Area'.
+  const zones = liveEvent?.zones ?? [];
 
   // Load incidents from MongoDB when live event changes
   useEffect(() => {
@@ -224,13 +248,14 @@ const LiveMonitoring: React.FC = () => {
       console.log('Event ID:', liveEvent.id);
       console.log('Reporter:', user?.name);
       
+      // `reporter` is a foreign key to users.id on the server and is now derived from the
+      // authenticated token there. Sending a display name violated that constraint and made
+      // every report fail, so the client no longer sends it at all.
       const incidentData = {
         eventId: liveEvent.id,
         type: newIncident.type,
         description: newIncident.description.trim(),
         location: newIncident.location,
-        reporter: user?.name || 'Anonymous',
-        reporterEmail: user?.email,
       };
       
       const savedIncident = await incidentService.createIncident(incidentData);
@@ -292,7 +317,7 @@ const LiveMonitoring: React.FC = () => {
 
   const getSafetyStatusColor = (status: string) => {
     switch (status) {
-      case 'OPTIMAL': return 'text-ai-white bg-ai-white/20';
+      case 'NO OPEN INCIDENTS': return 'text-ai-white bg-ai-white/20';
       case 'CAUTION': return 'text-ai-gray-300 bg-ai-gray-300/20';
       case 'ALERT': return 'text-ai-white bg-ai-white/20';
       default: return 'text-ai-gray-400 bg-ai-gray-500/20';
@@ -398,7 +423,9 @@ const LiveMonitoring: React.FC = () => {
                       <div className="text-xs sm:text-sm text-ai-gray-400">Units Ready</div>
                     </div>
                     <div>
-                      <div className="text-xl sm:text-2xl font-bold text-ai-white">{stats.responseTime}m</div>
+                      <div className="text-xl sm:text-2xl font-bold text-ai-white">
+                        {stats.responseTime !== null ? `${stats.responseTime.toFixed(1)}m` : 'N/A'}
+                      </div>
                       <div className="text-xs sm:text-sm text-gray-400">Avg Response</div>
                     </div>
                   </div>
@@ -470,10 +497,15 @@ const LiveMonitoring: React.FC = () => {
                     <div className="text-sm text-ai-gray-400">Zones Monitored</div>
                   </div>
                   
+                  {/* This tile showed a "Safety Score" of 100 - openIncidents*5: a number
+                      with no definition behind it. Until a safety score is actually defined
+                      and computed, the tile reports something the data supports. */}
                   <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
                     <Shield className="w-8 h-8 mx-auto mb-2 text-ai-white" />
-                    <div className="text-xl sm:text-2xl font-bold text-white">{stats.safetyScore}</div>
-                    <div className="text-sm text-gray-400">Safety Score</div>
+                    <div className="text-xl sm:text-2xl font-bold text-white">
+                      {incidents.filter(i => i.status === 'resolved').length}/{incidents.length}
+                    </div>
+                    <div className="text-sm text-gray-400">Incidents Resolved</div>
                   </div>
                 </motion.div>
               )}
@@ -596,7 +628,7 @@ const LiveMonitoring: React.FC = () => {
                                 <div className="flex flex-col xs:flex-row xs:items-center xs:justify-between gap-1 text-xs sm:text-sm">
                                   <span className="text-ai-white break-anywhere">📍 {incident.location}</span>
                                   <span className="text-ai-gray-500 break-anywhere">
-                                    {incident.timestamp.toLocaleTimeString()} by {incident.reporter}
+                                    {incident.timestamp.toLocaleTimeString()} by {incident.reporterName ?? 'Unknown reporter'}
                                   </span>
                                 </div>
 
@@ -691,7 +723,7 @@ const LiveMonitoring: React.FC = () => {
                       {liveEvent.zones && liveEvent.zones.length > 0 ? (
                         liveEvent.zones.slice(0, 4).map((zone, i) => (
                           <div 
-                            key={zone}
+                            key={zone.id || zone.zoneId}
                             className={`absolute max-w-[40%] truncate text-white text-[11px] sm:text-sm font-medium px-1.5 sm:px-2 py-0.5 sm:py-1 bg-black/40 backdrop-blur-sm rounded ${
                               i === 0 ? 'top-2 left-2 sm:top-4 sm:left-4' :
                               i === 1 ? 'top-2 right-2 sm:top-4 sm:right-4' :
@@ -699,7 +731,7 @@ const LiveMonitoring: React.FC = () => {
                               'bottom-2 right-2 sm:bottom-4 sm:right-4'
                             }`}
                           >
-                            {zone}
+                            {zone.name}
                           </div>
                         ))
                       ) : (
@@ -787,19 +819,40 @@ const LiveMonitoring: React.FC = () => {
                   >
                     <h3 className="text-lg font-semibold text-white mb-4">Zone Status</h3>
                     
+                    {/* Every row here used to be a random roll: a status and a crowd
+                        percentage regenerated on each render, so the numbers visibly flickered
+                        and meant nothing. They now come from the latest CrowdDensity reading
+                        already being polled above, and a zone with no reading says so. */}
                     <div className="space-y-3">
+                      {zones.length === 0 && (
+                        <p className="text-ai-gray-500 text-sm">
+                          No zones defined for this event.
+                        </p>
+                      )}
+
                       {zones.slice(0, 5).map((zone) => {
-                        const status = Math.random() > 0.7 ? 'caution' : 'normal';
-                        const crowdLevel = Math.floor(Math.random() * 40) + 30;
-                        
+                        const reading = crowdDensity.find(
+                          (d: any) => d.zoneId === zone.id || d.zoneName === zone.name
+                        );
+
                         return (
-                          <div key={zone} className="flex items-center justify-between gap-2">
-                            <span className="text-ai-gray-300 text-sm truncate">{zone}</span>
+                          <div key={zone.id || zone.zoneId} className="flex items-center justify-between gap-2">
+                            <span className="text-ai-gray-300 text-sm truncate">{zone.name}</span>
                             <div className="flex items-center gap-2 shrink-0">
-                              <span className="text-xs text-ai-gray-400">{crowdLevel}%</span>
-                              <div className={`w-2 h-2 rounded-full ${
-                                status === 'normal' ? 'bg-ai-white' : 'bg-ai-gray-400'
-                              }`} />
+                              {reading ? (
+                                <>
+                                  <span className="text-xs text-ai-gray-400">
+                                    {Math.round(reading.densityPercentage)}%
+                                  </span>
+                                  <div
+                                    className={`w-2 h-2 rounded-full ${
+                                      reading.densityPercentage >= 80 ? 'bg-ai-gray-400' : 'bg-ai-white'
+                                    }`}
+                                  />
+                                </>
+                              ) : (
+                                <span className="text-xs text-ai-gray-500">Awaiting first reading</span>
+                              )}
                             </div>
                           </div>
                         );
@@ -854,7 +907,7 @@ const LiveMonitoring: React.FC = () => {
                     >
                       <option value="">Select location</option>
                       {zones.map(zone => (
-                        <option key={zone} value={zone}>{zone}</option>
+                        <option key={zone.id || zone.zoneId} value={zone.name}>{zone.name}</option>
                       ))}
                     </select>
                   </div>

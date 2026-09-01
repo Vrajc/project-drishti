@@ -121,24 +121,54 @@ export class CrowdAnalysisService {
         throw new Error('Event has no zones defined');
       }
 
-      const zones: Zone[] = event.zones.map((zone: any, index: number) => ({
-        id: zone.zoneId || `zone-${index}`,
-        name: zone.name || zone,
-        coordinates: zone.coordinates || [
-          { x: 0, y: 0 },
-          { x: 100, y: 0 },
-          { x: 100, y: 100 },
-          { x: 0, y: 100 }
-        ],
-        maxCapacity: zone.maxCapacity || 10,
+      // `id` MUST be the Zone row's UUID, not its human-facing `zoneId`. CrowdDensity.zoneId
+      // is a foreign key to zones.id (crowd_densities_zoneId_fkey); passing "zone-0" here is
+      // what made every write fail with P2003. The analyzer echoes this id straight back.
+      const zones: Zone[] = event.zones.map((zone: any) => ({
+        id: zone.id,
+        name: zone.name,
+        coordinates: (zone.coordinates as Array<{ x: number; y: number }>) || [],
+        maxCapacity: zone.maxCapacity,
       }));
+
+      // A zone with no polygon cannot contain anyone: point-in-polygon returns false for
+      // every detection, so the analyzer would report a confident zero. Say so instead of
+      // silently substituting a full-frame rectangle.
+      const zonesWithoutGeometry = zones.filter(z => !z.coordinates || z.coordinates.length < 3);
+      if (zonesWithoutGeometry.length > 0) {
+        throw new Error(
+          `Cannot analyse footage: ${zonesWithoutGeometry.length} of ${zones.length} zone(s) ` +
+            `have no boundary defined (${zonesWithoutGeometry.map(z => z.name).join(', ')}). ` +
+            `Draw each zone's area on the venue map before running analysis.`
+        );
+      }
+
+      // CrowdDensity.cameraId is a foreign key to cameras.id. Accept either the UUID or the
+      // event-scoped cameraId from the caller, resolve it to the real row, and store null
+      // rather than an invented literal when the footage is not attributed to a camera.
+      let resolvedCameraId: string | undefined;
+      let resolvedCameraName: string | undefined;
+
+      if (cameraId) {
+        const camera = await prisma.camera.findFirst({
+          where: { eventId, OR: [{ id: cameraId }, { cameraId }] },
+          select: { id: true, name: true },
+        });
+
+        if (!camera) {
+          throw new Error(`Camera "${cameraId}" is not registered on this event`);
+        }
+
+        resolvedCameraId = camera.id;
+        resolvedCameraName = cameraName || camera.name;
+      }
 
       const records = await this.processVideo(
         videoPath,
         eventId,
         zones,
-        cameraId,
-        cameraName,
+        resolvedCameraId,
+        resolvedCameraName,
         sampleInterval
       );
 

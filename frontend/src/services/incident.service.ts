@@ -10,19 +10,24 @@ const getAuthHeaders = () => {
   };
 };
 
+// What the client sends. `reporter` is deliberately absent: it is a foreign key to
+// users.id and the server derives it from the authenticated token.
 export interface IncidentData {
   eventId: string;
   type: 'medical' | 'security' | 'lost_found' | 'general';
   description: string;
   location: string;
-  reporter: string;
-  reporterEmail?: string;
 }
 
 export interface Incident extends IncidentData {
   _id: string;
   timestamp: Date;
   status: 'open' | 'investigating' | 'resolved';
+  /** users.id of the reporter — an identifier, not a display value. */
+  reporter: string;
+  reporterEmail?: string;
+  /** Joined display name, or null if the user record has gone. */
+  reporterName: string | null;
   responseTime?: number;
   resolvedAt?: Date;
 }

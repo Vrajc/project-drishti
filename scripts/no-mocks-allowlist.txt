@@ -1,0 +1,16 @@
+# Allowlist for scripts/check-no-mocks.sh
+#
+# Format:   <path-substring> | <extended-regex matching the offending line> | <reason>
+# A finding is suppressed only when BOTH the path and the line regex match, so an
+# exemption cannot silently widen to cover a different line in the same file.
+#
+# THE RULE: an entry here must describe something that is not a displayed measurement.
+# Animation, particle effects and identifier generation qualify. A number a user reads
+# does not, no matter how inconvenient the failure is. Never add an entry to make a
+# fabricated value pass — delete the fabrication instead.
+
+frontend/src/components/ParticleHero.tsx | Math\.random | Particle positions/velocities for the hero canvas — decorative animation, never displayed as data.
+
+frontend/src/pages/EventSetup.tsx | id: Math\.random\(\)\.toString\(36\) | Client-side identifier generation for a newly added camera/dispatch-unit row.
+
+backend/src/controllers/crowdAnalysis.controller.ts | uniqueSuffix = Date\.now\(\) \+ '-' \+ Math\.round\(Math\.random\(\) \* 1E9\) | Uploaded-filename uniqueness suffix (multer) — an identifier, not a measurement.

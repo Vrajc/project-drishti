@@ -1,12 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
+// This must mirror exactly what auth.controller signs into the token. It previously
+// declared `{ id, email, role }`, which the token never carried, so `req.user.id` and
+// `req.user.email` were always undefined at runtime while type-checking cleanly.
+export interface JwtPayload {
+  userId: string;
+  role: string;
+}
+
 export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role: string;
-  };
+  user?: JwtPayload;
 }
 
 export const authenticate = async (
@@ -22,11 +26,7 @@ export const authenticate = async (
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as {
-      id: string;
-      email: string;
-      role: string;
-    };
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JwtPayload;
 
     req.user = decoded;
     next();

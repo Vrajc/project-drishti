@@ -87,11 +87,14 @@ const CrowdFlowAnalysis: React.FC = () => {
     setUploadStatus('Uploading video...');
 
     try {
+      // No camera is attributed to archived footage. This used to send a literal
+      // 'camera-1' / 'Main Camera', which is both invented and a foreign-key violation
+      // against cameras.id. Camera selection arrives with the camera registry.
       const result = await crowdAnalysisService.uploadVideo(
         selectedVideo,
         event.id,
-        'camera-1', // You can make this dynamic based on camera selection
-        'Main Camera',
+        undefined,
+        undefined,
         5 // Sample every 5 seconds for faster results
       );
 

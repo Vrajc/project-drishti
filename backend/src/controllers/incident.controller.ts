@@ -1,6 +1,14 @@
 import { Request, Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { IncidentType, IncidentStatus } from '@prisma/client';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
+
+// `reporter` is a foreign key to users.id, so every read that wants a human-readable
+// reporter has to join. Exposed additively as `reporterName` — `reporter` keeps its
+// existing meaning and position in the response so no caller breaks.
+const incidentInclude = {
+  reporterUser: { select: { name: true } },
+};
 
 const typeMap: Record<string, IncidentType> = {
   medical: 'MEDICAL',
@@ -17,18 +25,44 @@ const statusMap: Record<string, IncidentStatus> = {
 
 // Format incident to match frontend expectations (lowercase enums, _id field)
 function formatIncident(inc: any) {
+  const { reporterUser, ...rest } = inc;
   return {
-    ...inc,
+    ...rest,
     _id: inc.id,
     type: inc.type.toLowerCase(),
     status: inc.status.toLowerCase(),
+    reporterName: reporterUser?.name ?? null,
   };
 }
 
 // Create a new incident
-export const createIncident = async (req: Request, res: Response) => {
+export const createIncident = async (req: AuthRequest, res: Response) => {
   try {
-    const { eventId, type, description, location, reporter, reporterEmail } = req.body;
+    const { eventId, type, description, location } = req.body;
+
+    // The reporter is taken from the verified token, never from the request body. The
+    // client used to send the user's display name, which violated incidents_reporter_fkey
+    // and made every report fail with a 500 — the incidents table was empty as a result.
+    const userId = req.user?.userId;
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    if (!eventId || !description || !location) {
+      return res.status(400).json({
+        success: false,
+        message: 'eventId, description and location are required',
+      });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true },
+    });
+
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'Reporting user no longer exists' });
+    }
 
     const incident = await prisma.incident.create({
       data: {
@@ -36,11 +70,12 @@ export const createIncident = async (req: Request, res: Response) => {
         type: typeMap[type] || 'GENERAL',
         description,
         location,
-        reporter,
-        reporterEmail,
+        reporter: user.id,
+        reporterEmail: user.email,
         timestamp: new Date(),
         status: 'OPEN',
       },
+      include: incidentInclude,
     });
 
     res.status(201).json({
@@ -50,6 +85,15 @@ export const createIncident = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error creating incident:', error);
+
+    // Surface a referential failure honestly instead of a generic 500.
+    if (error.code === 'P2003') {
+      return res.status(400).json({
+        success: false,
+        message: 'Incident references an event that does not exist',
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Error reporting incident',
@@ -72,6 +116,7 @@ export const getIncidentsByEvent = async (req: Request, res: Response) => {
     const incidents = await prisma.incident.findMany({
       where,
       orderBy: { timestamp: 'desc' },
+      include: incidentInclude,
     });
 
     res.status(200).json({
@@ -123,6 +168,7 @@ export const updateIncidentStatus = async (req: Request, res: Response) => {
     const updated = await prisma.incident.update({
       where: { id },
       data: updateData,
+      include: incidentInclude,
     });
 
     res.status(200).json({
@@ -145,6 +191,7 @@ export const getAllIncidents = async (req: Request, res: Response) => {
   try {
     const incidents = await prisma.incident.findMany({
       orderBy: { timestamp: 'desc' },
+      include: incidentInclude,
     });
 
     res.status(200).json({

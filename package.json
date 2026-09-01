@@ -12,6 +12,11 @@
     "build:frontend": "cd frontend && npm run build",
     "build:backend": "cd backend && npm run build",
     "start:backend": "cd backend && npm start",
+    "verify": "npm run typecheck && npm run check:no-mocks",
+    "typecheck": "npm run typecheck:backend && npm run typecheck:frontend",
+    "typecheck:backend": "cd backend && npx tsc --noEmit",
+    "typecheck:frontend": "cd frontend && npx tsc --noEmit",
+    "check:no-mocks": "node scripts/run-sh.mjs scripts/check-no-mocks.sh",
     "clean": "rimraf frontend/node_modules frontend/dist backend/node_modules backend/dist"
   },
   "keywords": [

@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
 
 const getPrismaErrorResponse = (error: any) => {
   const code = error?.code as string | undefined;
@@ -181,9 +182,14 @@ export const login = async (req: Request, res: Response) => {
 };
 
 // Get user profile
-export const getProfile = async (req: Request, res: Response) => {
+export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {

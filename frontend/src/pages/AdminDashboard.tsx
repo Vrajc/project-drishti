@@ -18,6 +18,7 @@ const AdminDashboard: React.FC = () => {
   const [, setLoadingIncidents] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Get all events from context
   const allEvents = getAllEvents();
@@ -161,9 +162,18 @@ const AdminDashboard: React.FC = () => {
     return 'text-ai-gray-500';
   };
 
-  const handleDeleteEvent = (eventId: string) => {
-    deleteEvent(eventId);
-    setShowDeleteConfirm(null);
+  const handleDeleteEvent = async (eventId: string) => {
+    // deleteEvent now hits DELETE /api/events/:id. It previously only edited localStorage,
+    // so the event reappeared on the next refresh; if the server refuses, say so rather
+    // than closing the dialog as though it worked.
+    setDeleteError(null);
+    try {
+      await deleteEvent(eventId);
+      setShowDeleteConfirm(null);
+    } catch (error: any) {
+      console.error('Delete event error:', error);
+      setDeleteError(error?.message || 'Could not delete this event. It has not been removed.');
+    }
   };
 
   const handleViewEvent = (event: Event) => {
@@ -837,8 +847,8 @@ const AdminDashboard: React.FC = () => {
                 <div className="text-sm text-ai-gray-500 mb-1">Zones ({selectedEvent.zones.length})</div>
                 <div className="flex flex-wrap gap-2">
                   {selectedEvent.zones.map((zone, idx) => (
-                    <span key={idx} className="px-3 py-1 bg-ai-gray-900/50 border border-ai-gray-800 rounded-lg text-ai-white text-sm">
-                      {zone}
+                    <span key={zone.id || idx} className="px-3 py-1 bg-ai-gray-900/50 border border-ai-gray-800 rounded-lg text-ai-white text-sm">
+                      {zone.name}
                     </span>
                   ))}
                 </div>
@@ -913,11 +923,17 @@ const AdminDashboard: React.FC = () => {
               Are you sure you want to delete this event? All associated data will be permanently removed.
             </p>
 
+            {deleteError && (
+              <div className="mb-4 p-3 rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 text-sm">
+                {deleteError}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
-                onClick={() => setShowDeleteConfirm(null)}
+                onClick={() => { setDeleteError(null); setShowDeleteConfirm(null); }}
                 className="flex-1 px-4 py-2 bg-ai-gray-900/50 border border-ai-gray-800 rounded-lg text-ai-white hover:border-ai-gray-700 transition-all"
               >
                 Cancel

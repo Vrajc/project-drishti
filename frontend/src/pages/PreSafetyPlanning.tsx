@@ -15,21 +15,36 @@ const PreSafetyPlanning: React.FC = () => {
 
   const analyzeEvent = async () => {
     if (!event) return;
-    
+
+    // Without zones there is nothing real to plan around. This used to fall through to
+    // ['Main Area', 'Food Court', 'VIP Section'], so the AI produced a confident plan for
+    // three areas the venue did not have.
+    if (!event.zones || event.zones.length === 0) {
+      alert(
+        'This event has no zones defined yet.\n\n' +
+        'Add zones in Event Setup so the analysis can be based on the real venue layout.'
+      );
+      return;
+    }
+
     setIsAnalyzing(true);
-    
+
     try {
       // These read `event.expectedAttendance` / `.venue` / `.duration`, none of
-      // which exist on Event — so every analysis silently ran on the hardcoded
-      // fallbacks instead of the real event. Mapped to the actual fields.
+      // which exist on Event — so every analysis silently ran on the fallback
+      // constants instead of the real event. Mapped to the actual fields.
       // Event carries no duration, so that default genuinely stands.
+      //
+      // The zone list no longer falls back to ['Main Area', 'Food Court', 'VIP Section'];
+      // an event with no zones is caught above so the AI is never asked to plan for
+      // areas that do not exist.
       const result = await analyzeSafetyPlanning({
         name: event.name,
         type: event.type || 'General Event',
         expectedAttendance: event.crowdSize || 1000,
         venue: event.location || 'Event Venue',
         duration: 'Full Day',
-        zones: event.zones?.length ? event.zones : ['Main Area', 'Food Court', 'VIP Section']
+        zones: (event.zones ?? []).map(z => z.name)
       });
 
       if (result.success && result.analysis) {
@@ -242,7 +257,7 @@ const PreSafetyPlanning: React.FC = () => {
                   {/* Zones */}
                   {!event?.mapFile && event?.zones.slice(0, 4).map((zone, index) => (
                     <div
-                      key={zone}
+                      key={zone.id || zone.zoneId}
                       className={`absolute w-16 h-12 bg-ai-gray-600/20 border border-ai-gray-600 rounded flex items-center justify-center text-xs text-ai-gray-300 ${
                         index === 0 ? 'top-16 left-4' :
                         index === 1 ? 'top-16 right-4' :
@@ -250,7 +265,7 @@ const PreSafetyPlanning: React.FC = () => {
                         'bottom-16 right-4'
                       }`}
                     >
-                      {zone.length > 8 ? zone.substring(0, 8) + '...' : zone}
+                      {zone.name.length > 8 ? zone.name.substring(0, 8) + '...' : zone.name}
                     </div>
                   ))}
 

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useEvent } from '../contexts/EventContext';
+import { useEvent, normaliseZones } from '../contexts/EventContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Clock, Users, MapPin, Upload, ArrowRight, Video, Truck, Phone, X } from 'lucide-react';
 import MeshGradient from '../components/MeshGradient';
@@ -93,9 +93,14 @@ const EventSetup: React.FC = () => {
       
       if (response.success) {
         // Also add to local context for immediate UI update
+        // The server is the authority on what a zone is: it returns Zone rows with ids,
+        // coordinates and capacities. Seed the context from the response rather than from
+        // the plain strings this form collected, so the shape matches what a page reload
+        // will produce.
         addEvent({
           id: response.data._id,
           ...eventData,
+          zones: normaliseZones(response.data.zones),
           mapFile: response.data.mapFile, // Map file URL
           registeredUsers: []
         });

@@ -26,22 +26,20 @@ interface Emergency {
   id: string;
   type: 'medical' | 'fire' | 'security' | 'evacuation';
   location: string;
-  coordinates: { lat: number; lng: number };
   priority: 'low' | 'medium' | 'high' | 'critical';
   timestamp: Date;
   status: 'pending' | 'dispatched' | 'en-route' | 'on-scene' | 'resolved';
   assignedUnit?: string;
-  estimatedTime?: number;
-  routeDistance?: number;
 }
 
 interface ResponderUnit {
   id: string;
+  /** DispatchUnit.unitId — the stable identifier, not the display name. */
+  unitId: string;
+  name: string;
   type: 'ambulance' | 'fire_truck' | 'security' | 'police';
   location: string;
-  coordinates: { lat: number; lng: number };
   status: 'available' | 'busy' | 'offline';
-  eta?: number;
 }
 
 const EmergencyDispatch: React.FC = () => {
@@ -52,6 +50,7 @@ const EmergencyDispatch: React.FC = () => {
   const [isActive, setIsActive] = useState(false);
   const [, setSelectedEmergency] = useState<Emergency | null>(null);
   const [, setIncidents] = useState<Incident[]>([]);
+  const [dispatchError, setDispatchError] = useState<string | null>(null);
 
   // Helper function to check if event is live
   const isEventLive = (date: string, time: string): boolean => {
@@ -134,7 +133,6 @@ const EmergencyDispatch: React.FC = () => {
             id: inc._id || inc.id || '',
             type: emergencyType,
             location: inc.location,
-            coordinates: { lat: 40.7128 + (Math.random() - 0.5) * 0.01, lng: -74.0060 + (Math.random() - 0.5) * 0.01 },
             priority,
             timestamp: inc.timestamp,
             status: emergencyStatus
@@ -175,27 +173,12 @@ const EmergencyDispatch: React.FC = () => {
     critical: 'border-ai-white bg-ai-white/10'
   };
 
-  const generateMockResponders = (): ResponderUnit[] => {
-    const types = ['ambulance', 'fire_truck', 'security', 'police'] as const;
-    const locations = ['Station 1', 'Station 2', 'Mobile Unit A', 'Mobile Unit B', 'Patrol 1', 'Patrol 2'];
-    
-    return Array.from({ length: 8 }, (_, i) => ({
-      id: `unit-${i + 1}`,
-      type: types[Math.floor(Math.random() * types.length)],
-      location: locations[i % locations.length],
-      coordinates: {
-        lat: 40.7128 + (Math.random() - 0.5) * 0.02,
-        lng: -74.0060 + (Math.random() - 0.5) * 0.02
-      },
-      status: Math.random() > 0.7 ? 'busy' : 'available'
-    }));
-  };
-
   useEffect(() => {
     if (isActive) {
-      if (eventDispatchUnits.length > 0) {
-        // Convert event dispatch units to responder format
-        const units: ResponderUnit[] = eventDispatchUnits.map(unit => {
+      // Responders come from the event's DispatchUnit rows and nowhere else. There is no
+      // fallback: an event with no units configured shows an empty state, because inventing
+      // eight units at New York coordinates is worse than showing none.
+      const units: ResponderUnit[] = eventDispatchUnits.map(unit => {
           // Map dispatch unit types to responder types
           let responderType: 'ambulance' | 'fire_truck' | 'security' | 'police' = 'security';
           if (unit.type.toLowerCase().includes('ambulance') || unit.type.toLowerCase().includes('medical')) {
@@ -206,85 +189,58 @@ const EmergencyDispatch: React.FC = () => {
             responderType = 'police';
           }
           
-          return {
-            id: unit.name,
-            type: responderType,
-            location: unit.location || 'Base Location',
-            coordinates: { lat: 0, lng: 0 }, // Would be set from real location
-            status: 'available'
-          };
-        });
-        console.log('Setting responders from event dispatch units:', units);
-        setResponders(units);
-      } else {
-        // Fallback to mock responders if no event dispatch units configured
-        console.log('No event dispatch units, using mock responders');
-        setResponders(generateMockResponders());
-      }
+        return {
+          id: unit.id,
+          unitId: unit.id,
+          name: unit.name,
+          type: responderType,
+          location: unit.location || '',
+          status: 'available' as const
+        };
+      });
+
+      setResponders(units);
     } else {
       // Clear responders when system is deactivated
       setResponders([]);
     }
   }, [isActive, eventDispatchUnits]);
 
-  const calculateOptimalRoute = async (emergency: Emergency) => {
-    // Mock optimal routing calculation
+  // Dispatching a unit is a real operator action: it assigns a responder and moves the
+  // incident to INVESTIGATING in Postgres. Everything that used to follow it was theatre —
+  // a random "closest" responder, a random ETA and route distance, and a setTimeout that
+  // wrote status:'resolved' back to the database after 2-12 seconds. That timer meant the
+  // Incident.responseTime column, which the organizer and admin dashboards present as a
+  // measured average, was populated by a browser countdown. Resolution is now only ever
+  // recorded when a human marks the incident resolved.
+  //
+  // Nearest-unit selection and a real road-distance ETA need unit coordinates and a routing
+  // service; until those exist this assigns the first available unit and shows no ETA.
+  const dispatchUnitToEmergency = async (emergency: Emergency) => {
     const availableResponders = responders.filter(r => r.status === 'available');
     if (availableResponders.length === 0) return;
 
-    // Find closest responder (mock calculation)
-    const closestResponder = availableResponders[Math.floor(Math.random() * availableResponders.length)];
-    const estimatedTime = Math.floor(Math.random() * 10) + 2; // 2-12 minutes
-    const routeDistance = Math.floor(Math.random() * 5) + 1; // 1-6 km
+    const assigned = availableResponders[0];
 
-    // Update incident status in MongoDB to 'investigating' when dispatched
     try {
       await incidentService.updateIncidentStatus(emergency.id, 'investigating');
-      console.log('Incident status updated to investigating for emergency:', emergency.id);
     } catch (error) {
       console.error('Error updating incident status:', error);
+      setDispatchError('Could not record the dispatch. The incident was left unchanged.');
+      return;
     }
 
-    // Update emergency locally
-    setEmergencies(prev => prev.map(e => 
-      e.id === emergency.id 
-        ? { 
-            ...e, 
-            status: 'dispatched', 
-            assignedUnit: closestResponder.id,
-            estimatedTime,
-            routeDistance
-          }
+    setDispatchError(null);
+
+    setEmergencies(prev => prev.map(e =>
+      e.id === emergency.id
+        ? { ...e, status: 'dispatched', assignedUnit: assigned.name }
         : e
     ));
 
-    // Update responder status
-    setResponders(prev => prev.map(r => 
-      r.id === closestResponder.id 
-        ? { ...r, status: 'busy', eta: estimatedTime }
-        : r
+    setResponders(prev => prev.map(r =>
+      r.id === assigned.id ? { ...r, status: 'busy' } : r
     ));
-
-    // Simulate status updates
-    setTimeout(() => {
-      setEmergencies(prev => prev.map(e => 
-        e.id === emergency.id ? { ...e, status: 'en-route' } : e
-      ));
-    }, 2000);
-
-    setTimeout(async () => {
-      setEmergencies(prev => prev.map(e => 
-        e.id === emergency.id ? { ...e, status: 'on-scene' } : e
-      ));
-      
-      // Mark incident as resolved when team is on-scene
-      try {
-        await incidentService.updateIncidentStatus(emergency.id, 'resolved');
-        console.log('Incident marked as resolved:', emergency.id);
-      } catch (error) {
-        console.error('Error resolving incident:', error);
-      }
-    }, estimatedTime * 1000);
   };
 
   const toggleSystem = () => {
@@ -407,7 +363,15 @@ const EmergencyDispatch: React.FC = () => {
                   </span>
                 )}
               </h3>
-              
+
+              {/* A failed dispatch used to be visible only in the console while the UI moved
+                  the card to "dispatched" anyway. Say so on screen instead. */}
+              {dispatchError && (
+                <div className="mb-4 p-3 rounded-lg border border-red-500/40 bg-red-500/10 text-red-300 text-sm">
+                  {dispatchError}
+                </div>
+              )}
+
               <div className="space-y-4">
                 {emergencies.slice(0, 6).map((emergency, index) => {
                   const EmergencyIcon = emergencyTypes[emergency.type].icon;
@@ -462,7 +426,7 @@ const EmergencyDispatch: React.FC = () => {
                             whileTap={{ scale: 0.95 }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              calculateOptimalRoute(emergency);
+                              dispatchUnitToEmergency(emergency);
                             }}
                             className="shrink-0 px-3 py-1.5 bg-ai-white text-ai-black rounded-lg hover:bg-ai-gray-300 text-sm transition-colors"
                           >
@@ -479,8 +443,12 @@ const EmergencyDispatch: React.FC = () => {
                         >
                           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs sm:text-sm">
                             <span className="text-ai-white break-anywhere">Unit: {emergency.assignedUnit}</span>
-                            <span className="text-ai-white">ETA: {emergency.estimatedTime}m</span>
-                            <span className="text-ai-white">{emergency.routeDistance}km</span>
+                            <span
+                              className="text-ai-gray-500"
+                              title="A road-distance ETA needs unit coordinates and a routing service"
+                            >
+                              ETA unavailable
+                            </span>
                           </div>
                         </motion.div>
                       )}
@@ -526,67 +494,25 @@ const EmergencyDispatch: React.FC = () => {
                     </div>
                   )}
                   
-                  {isActive && (
-                    <>
-                      {/* Emergency markers */}
-                      {emergencies.slice(0, 4).map((emergency, i) => (
-                        <motion.div
-                          key={emergency.id}
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className={`absolute w-4 h-4 ${
-                            emergency.status === 'pending' ? 'bg-ai-white' : 'bg-ai-gray-400'
-                          } rounded-full ${
-                            i === 0 ? 'top-1/4 left-1/4' :
-                            i === 1 ? 'top-1/3 right-1/3' :
-                            i === 2 ? 'bottom-1/3 left-1/2' :
-                            'bottom-1/4 right-1/4'
-                          }`}
-                          style={{
-                            filter: 'drop-shadow(0 0 8px currentColor)'
-                          }}
-                        />
-                      ))}
-                      
-                      {/* Responder markers */}
-                      {responders.slice(0, 6).map((responder, i) => (
-                        <motion.div
-                          key={responder.id}
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          className={`absolute w-3 h-3 ${
-                            responder.status === 'available' ? 'bg-ai-white' : 'bg-ai-gray-500'
-                          } rounded-full ${
-                            i === 0 ? 'top-1/5 left-1/5' :
-                            i === 1 ? 'top-2/5 right-1/5' :
-                            i === 2 ? 'bottom-2/5 left-1/3' :
-                            i === 3 ? 'bottom-1/5 right-1/3' :
-                            i === 4 ? 'top-1/2 left-1/6' :
-                            'top-3/5 right-1/6'
-                          }`}
-                        />
-                      ))}
-                      
-                      {/* Route lines */}
-                      <svg className="absolute inset-0 w-full h-full">
-                        {activeDispatches.map((emergency, i) => (
-                          <motion.line
-                            key={emergency.id}
-                            initial={{ pathLength: 0 }}
-                            animate={{ pathLength: 1 }}
-                            x1={`${20 + i * 20}%`}
-                            y1={`${30 + i * 15}%`}
-                            x2={`${60 + i * 10}%`}
-                            y2={`${70 - i * 15}%`}
-                            stroke="#ffffff"
-                            strokeWidth="2"
-                            strokeDasharray="4 2"
-                            className="animate-pulse"
-                          />
-                        ))}
-                      </svg>
-                    </>
-                  )}
+                    {isActive && (
+                      // Emergency and responder markers used to be placed by array index
+                      // (top-1/4 left-1/4, top-1/3 right-1/3 ...) and route lines by fixed
+                      // percentages, so every position on this map was decorative. Neither
+                      // incidents nor dispatch units carry coordinates yet, so the map states
+                      // what it actually knows instead of drawing pins it cannot place.
+                      <div className="absolute inset-0 flex items-center justify-center p-4">
+                        <div className="bg-ai-black/70 backdrop-blur-sm rounded-xl p-4 text-center max-w-xs">
+                          <p className="text-ai-gray-300 text-sm font-medium">
+                            {activeDispatches.length} active dispatch{activeDispatches.length === 1 ? '' : 'es'},{' '}
+                            {pendingEmergencies.length} pending
+                          </p>
+                          <p className="text-ai-gray-500 text-xs mt-2">
+                            Positions are not plotted: incidents and dispatch units have no
+                            coordinates recorded yet.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   
                   {!isActive && (
                     <div className="absolute inset-0 flex items-center justify-center">
@@ -619,7 +545,7 @@ const EmergencyDispatch: React.FC = () => {
                 <div className="space-y-3">
                   {responders.map((responder, index) => {
                     // Find original dispatch unit info
-                    const dispatchUnit = eventDispatchUnits.find(u => u.name === responder.id);
+                    const dispatchUnit = eventDispatchUnits.find(u => u.id === responder.unitId);
                     
                     return (
                       <motion.div
@@ -632,8 +558,10 @@ const EmergencyDispatch: React.FC = () => {
                         <div className="flex items-center gap-3 flex-1">
                           <span className="text-xl">{responderTypes[responder.type].icon}</span>
                           <div className="flex-1">
-                            <div className="font-medium text-white">{responder.id}</div>
-                            <div className="text-xs sm:text-sm text-ai-gray-400">{responder.location}</div>
+                            <div className="font-medium text-white">{responder.name}</div>
+                            <div className="text-xs sm:text-sm text-ai-gray-400">
+                              {responder.location || 'No base location recorded'}
+                            </div>
                             {dispatchUnit && (
                               <div className="flex items-center gap-2 mt-1 text-xs text-ai-gray-500">
                                 {dispatchUnit.contact && (
@@ -650,9 +578,6 @@ const EmergencyDispatch: React.FC = () => {
                         </div>
                         
                         <div className="flex items-center gap-3 shrink-0">
-                          {responder.eta && (
-                            <span className="text-sm text-ai-white whitespace-nowrap">ETA: {responder.eta}m</span>
-                          )}
                           <span className={`px-2 py-1 rounded-full text-xs ${
                             responder.status === 'available' ? 'bg-ai-white/20 text-ai-white' :
                             responder.status === 'busy' ? 'bg-ai-gray-600/20 text-ai-gray-400' :

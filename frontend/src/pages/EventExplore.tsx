@@ -14,6 +14,7 @@ const EventExplore: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
+  const [registrationError, setRegistrationError] = useState<string | null>(null);
 
   const allEvents = getAllEvents();
   const userRegisteredEventIds = getUserRegisteredEvents(user?.id || '').map(e => e.id);
@@ -30,10 +31,16 @@ const EventExplore: React.FC = () => {
   const handleRegister = async (eventId: string) => {
     if (user?.id && !registeringEventId) {
       setRegisteringEventId(eventId);
+      setRegistrationError(null);
       try {
         await registerForEvent(eventId, user.id);
-      } catch (error) {
+      } catch (error: any) {
+        // A failed registration used to be logged and then shown as success, because the
+        // context added the user locally regardless. Report it instead.
         console.error('Registration error:', error);
+        setRegistrationError(
+          error?.message || 'Registration failed. You are not registered for this event.'
+        );
       } finally {
         setRegisteringEventId(null);
       }
@@ -102,6 +109,12 @@ const EventExplore: React.FC = () => {
               </div>
             </div>
           </motion.div>
+
+          {registrationError && (
+            <div className="mb-6 p-4 rounded-xl border border-red-500/40 bg-red-500/10 text-red-300 text-sm">
+              {registrationError}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredEvents.map((event, index) => {

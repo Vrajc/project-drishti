@@ -1,5 +1,9 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAllEvents as fetchAllEvents, registerForEvent as registerForEventAPI } from '../services/event.service';
+import {
+  getAllEvents as fetchAllEvents,
+  registerForEvent as registerForEventAPI,
+  deleteEvent as deleteEventAPI,
+} from '../services/event.service';
 
 export interface Camera {
   id: string;
@@ -7,6 +11,20 @@ export interface Camera {
   location: string;
   ipAddress: string;
   rtspUrl: string;
+}
+
+// A zone as the API returns it. The context previously typed `zones` as `string[]`, which
+// was true only for an event just created in this browser session: `refreshEvents()`
+// replaces it with the Zone rows the server sends, so after any reload the pages that
+// rendered `{zone}` directly threw "Objects are not valid as a React child". tsc could not
+// see it because the API response is `any`.
+export interface Zone {
+  id: string;
+  zoneId: string;
+  name: string;
+  coordinates: Array<{ x: number; y: number }>;
+  maxCapacity: number;
+  color?: string;
 }
 
 export interface DispatchUnit {
@@ -27,7 +45,7 @@ export interface Event {
   date: string;
   time: string;
   crowdSize: number;
-  zones: string[];
+  zones: Zone[];
   cameras: Camera[];
   dispatchUnits: DispatchUnit[];
   location: string;
@@ -46,13 +64,41 @@ interface EventContextType {
   setEvent: (event: Event) => void;
   addEvent: (event: Event) => void;
   clearEvent: () => void;
-  deleteEvent: (eventId: string) => void;
+  deleteEvent: (eventId: string) => Promise<void>;
   getEventsByOrganizer: (organizerEmail: string) => Event[];
   getAllEvents: () => Event[];
   registerForEvent: (eventId: string, userId: string) => Promise<void>;
   getUserRegisteredEvents: (userId: string) => Event[];
   refreshEvents: () => Promise<void>;
 }
+
+// EventSetup collects zone names as plain strings, while the API returns Zone rows. Coerce
+// both to Zone[] at the single point where events enter the context, so no page has to
+// guess which shape it holds.
+export const normaliseZones = (zones: unknown): Zone[] => {
+  if (!Array.isArray(zones)) return [];
+
+  return zones.map((zone: any, index: number) => {
+    if (typeof zone === 'string') {
+      return {
+        id: '',
+        zoneId: `zone-${index}`,
+        name: zone,
+        coordinates: [],
+        maxCapacity: 0,
+      };
+    }
+
+    return {
+      id: zone?.id ?? '',
+      zoneId: zone?.zoneId ?? `zone-${index}`,
+      name: zone?.name ?? `Zone ${index + 1}`,
+      coordinates: Array.isArray(zone?.coordinates) ? zone.coordinates : [],
+      maxCapacity: typeof zone?.maxCapacity === 'number' ? zone.maxCapacity : 0,
+      color: zone?.color,
+    };
+  });
+};
 
 const EventContext = createContext<EventContextType | undefined>(undefined);
 
@@ -109,7 +155,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
           date: e.date,
           time: e.time,
           crowdSize: e.crowdSize,
-          zones: e.zones,
+          zones: normaliseZones(e.zones),
           cameras: e.cameras,
           dispatchUnits: e.dispatchUnits,
           location: e.location,
@@ -148,11 +194,17 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
     localStorage.removeItem('drishti_current_event');
   };
 
-  const deleteEvent = (eventId: string) => {
+  // This only ever edited localStorage, so an admin "deleting" an event saw the row vanish
+  // while it stayed in Postgres and returned on the next refresh. It now calls the API and
+  // only drops the row locally once the server has actually deleted it; failures propagate
+  // to the caller so the UI can say the delete did not happen.
+  const deleteEvent = async (eventId: string) => {
+    await deleteEventAPI(eventId);
+
     const updatedEvents = events.filter(e => e.id !== eventId);
     setEvents(updatedEvents);
     localStorage.setItem('drishti_all_events', JSON.stringify(updatedEvents));
-    
+
     // If the deleted event was the current event, clear it
     if (event?.id === eventId) {
       clearEvent();
@@ -168,40 +220,26 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
   };
 
   const registerForEvent = async (eventId: string, userId: string) => {
-    try {
-      // Call the API to register
-      await registerForEventAPI(eventId, userId);
-      
-      // Update local state
-      const updatedEvents = events.map(e => {
-        if (e.id === eventId) {
-          const registeredUsers = e.registeredUsers || [];
-          if (!registeredUsers.includes(userId)) {
-            return { ...e, registeredUsers: [...registeredUsers, userId] };
-          }
+    // The previous version caught a failed registration and added the user to
+    // registeredUsers anyway, so the UI showed "Registered" for someone the server had
+    // rejected — and persisted that lie to localStorage. A failure now propagates to the
+    // caller, which surfaces it, and local state only changes once the server has agreed.
+    await registerForEventAPI(eventId, userId);
+
+    const updatedEvents = events.map(e => {
+      if (e.id === eventId) {
+        const registeredUsers = e.registeredUsers || [];
+        if (!registeredUsers.includes(userId)) {
+          return { ...e, registeredUsers: [...registeredUsers, userId] };
         }
-        return e;
-      });
-      setEvents(updatedEvents);
-      localStorage.setItem('drishti_all_events', JSON.stringify(updatedEvents));
-      
-      // Refresh events from server to ensure consistency
-      await refreshEvents();
-    } catch (error) {
-      console.error('Error registering for event:', error);
-      // If API call fails, still update local state as fallback
-      const updatedEvents = events.map(e => {
-        if (e.id === eventId) {
-          const registeredUsers = e.registeredUsers || [];
-          if (!registeredUsers.includes(userId)) {
-            return { ...e, registeredUsers: [...registeredUsers, userId] };
-          }
-        }
-        return e;
-      });
-      setEvents(updatedEvents);
-      localStorage.setItem('drishti_all_events', JSON.stringify(updatedEvents));
-    }
+      }
+      return e;
+    });
+    setEvents(updatedEvents);
+    localStorage.setItem('drishti_all_events', JSON.stringify(updatedEvents));
+
+    // Refresh events from server to ensure consistency
+    await refreshEvents();
   };
 
   const getUserRegisteredEvents = (userId: string): Event[] => {
