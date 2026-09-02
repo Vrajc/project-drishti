@@ -130,8 +130,8 @@ refused. It only creates missing accounts and never rewrites an existing
 password — so `test@gmail.com`, which the live database already has, keeps the
 credentials it has today. Change that password by hand if it matters.
 
-**Leave unset while the camera stack is not hosted:** `REDIS_URL`,
-`MEDIAMTX_RTSP_BASE`, `MEDIAMTX_HLS_BASE`, `MEDIAMTX_WEBRTC_BASE`. These now
+**Leave unset while the camera stack is not hosted:** `AI_SERVICE_URL`,
+`REDIS_URL`, `MEDIAMTX_RTSP_BASE`, `MEDIAMTX_HLS_BASE`, `MEDIAMTX_WEBRTC_BASE`. These now
 have honest behaviour when absent rather than a localhost fallback — see below.
 
 **On Vercel:** Root Directory `frontend`, and `VITE_API_URL` pointing at the
@@ -153,6 +153,7 @@ Nothing crashes. Each piece stands down and says why in the boot log:
 | Watchlist match engine | Same rule, same log line. |
 | Camera health poller | Runs, but an empty camera registry means an empty sweep. It only becomes noise if you seed cameras the deployment cannot reach — then set `CAMERA_HEALTH_ENABLED=false`. |
 | Live wall / streams | The API reports that no playable URL exists for a camera whose RTSP host is not the configured MediaMTX, rather than composing a URL that would 404. |
+| Detection | With `AI_SERVICE_URL` unset the zone editor says no detector is configured and offers no start control, instead of a button that cannot work. Cameras and zones can still be set up; nothing is counted until a detector exists. |
 
 So the police and surveillance pages will render and navigate, and will be
 empty of live data. That is the honest state, not a bug — but it is worth

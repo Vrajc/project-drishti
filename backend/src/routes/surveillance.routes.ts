@@ -12,6 +12,9 @@ import {
   getCameraStreamEndpoints,
   createDepartment,
   createSite,
+  getDetectionStatus,
+  startCameraDetection,
+  stopCameraDetection,
   getCameraZones,
   createCameraZone,
   updateCameraZone,
@@ -47,6 +50,12 @@ router.get('/cameras/:id/zones', authenticate, canRead, getCameraZones);
 router.post('/cameras/:id/zones', authenticate, canWrite, createCameraZone);
 router.put('/zones/:zoneId', authenticate, canWrite, updateCameraZone);
 router.delete('/zones/:zoneId', authenticate, canWrite, deleteCameraZone);
+
+// Detection. The ai-service has always had these endpoints; nothing called
+// them, so the counting chain stopped after a zone was drawn.
+router.get('/detection', authenticate, canRead, getDetectionStatus);
+router.post('/cameras/:id/detection/start', authenticate, canWrite, startCameraDetection);
+router.post('/cameras/:id/detection/stop', authenticate, canWrite, stopCameraDetection);
 
 // Probing is a write in the sense that it records CameraHealth rows and moves
 // Camera.status, so it is held to the same roles as editing the registry.

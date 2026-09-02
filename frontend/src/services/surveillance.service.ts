@@ -543,3 +543,66 @@ export const createSite = async (payload: {
     rethrow(error, 'Creating the site');
   }
 };
+
+// ---------------------------------------------------------------------------
+// Detection
+//
+// Starting the detector on a camera composes the request from what the registry
+// knows - the stream URL, the zones drawn on it, and the canvas those zones are
+// expressed in. That last part is what makes occupancy countable: without it
+// the detector refuses to guess a scale and publishes nothing.
+// ---------------------------------------------------------------------------
+
+export interface DetectorWorker {
+  camera_id?: string;
+  cameraId?: string;
+  state: string;
+  reason?: string | null;
+}
+
+export interface DetectorStatus {
+  /** False when AI_SERVICE_URL is unset: no detector exists to talk to. */
+  configured: boolean;
+  reachable: boolean;
+  /** Why it is unusable, when it is. Null when everything is fine. */
+  reason: string | null;
+  workers: DetectorWorker[];
+}
+
+export const getDetectionStatus = async () => {
+  try {
+    const response = await axios.get<{ success: boolean; data: DetectorStatus }>(
+      `${API_URL}/detection`,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Reading the detector status');
+  }
+};
+
+export const startCameraDetection = async (cameraId: string) => {
+  try {
+    const response = await axios.post<{
+      success: boolean;
+      message: string;
+      data: { zonesSent: number; countingPossible: boolean };
+    }>(`${API_URL}/cameras/${cameraId}/detection/start`, {}, { headers: authHeaders() });
+    return response.data;
+  } catch (error: any) {
+    rethrow(error, 'Starting detection');
+  }
+};
+
+export const stopCameraDetection = async (cameraId: string) => {
+  try {
+    const response = await axios.post<{ success: boolean; message: string }>(
+      `${API_URL}/cameras/${cameraId}/detection/stop`,
+      {},
+      { headers: authHeaders() }
+    );
+    return response.data;
+  } catch (error: any) {
+    rethrow(error, 'Stopping detection');
+  }
+};

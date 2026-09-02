@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { X, Loader, Trash2, AlertTriangle, Plus, Undo2 } from 'lucide-react';
+import { X, Loader, Trash2, AlertTriangle, Plus, Undo2, Play, Square } from 'lucide-react';
 import * as surveillance from '../../services/surveillance.service';
-import type { CameraZone, RegistryCamera, ZoneVertex } from '../../services/surveillance.service';
+import type {
+  CameraZone, DetectorStatus, RegistryCamera, ZoneVertex,
+} from '../../services/surveillance.service';
 
 /**
  * Defining the counting zones on a camera.
@@ -44,10 +46,20 @@ const CameraZonesModal: React.FC<Props> = ({ camera, onClose, onChanged }) => {
   const [formError, setFormError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const [detector, setDetector] = useState<DetectorStatus | null>(null);
+  const [detectorBusy, setDetectorBusy] = useState(false);
+  const [detectorNote, setDetectorNote] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     try {
-      const data = await surveillance.getCameraZones(camera.id);
+      const [data, status] = await Promise.all([
+        surveillance.getCameraZones(camera.id),
+        // A detector that is not configured is a normal state for a deployment
+        // without the camera stack, so this never fails the whole dialog.
+        surveillance.getDetectionStatus().catch(() => null),
+      ]);
       setZones(data?.zones ?? []);
+      setDetector(status ?? null);
       setLoadError(null);
     } catch (error: any) {
       setZones([]);
@@ -115,6 +127,27 @@ const CameraZonesModal: React.FC<Props> = ({ camera, onClose, onChanged }) => {
       setLoadError(error?.message ?? 'The zone could not be deleted');
     } finally {
       setBusyId(null);
+    }
+  };
+
+  const runningHere = (detector?.workers ?? []).find(
+    (worker) => (worker.cameraId ?? worker.camera_id) === camera.cameraId
+  );
+
+  const toggleDetection = async (start: boolean) => {
+    setDetectorBusy(true);
+    setDetectorNote(null);
+    try {
+      const result = start
+        ? await surveillance.startCameraDetection(camera.id)
+        : await surveillance.stopCameraDetection(camera.id);
+      setDetectorNote(result?.message ?? null);
+      await load();
+      onChanged?.();
+    } catch (error: any) {
+      setDetectorNote(error?.message ?? 'The detector did not answer');
+    } finally {
+      setDetectorBusy(false);
     }
   };
 
@@ -283,6 +316,45 @@ const CameraZonesModal: React.FC<Props> = ({ camera, onClose, onChanged }) => {
                     </>
                   )}
                 </button>
+              </div>
+
+              {/* Detection: the step that turns a drawn zone into counts. */}
+              <div className="rounded-xl border border-ai-gray-800 p-4 space-y-3">
+                <h3 className="text-sm font-medium text-ai-white">Detection</h3>
+
+                {detector === null ? (
+                  <p className="text-sm text-ai-gray-500">Detector status unavailable.</p>
+                ) : !detector.configured ? (
+                  <p className="text-sm text-ai-gray-500">{detector.reason}</p>
+                ) : !detector.reachable ? (
+                  <p className="text-sm text-amber-400 break-anywhere">{detector.reason}</p>
+                ) : (
+                  <>
+                    <p className="text-sm text-ai-gray-400">
+                      {runningHere
+                        ? `Running on this camera — ${runningHere.state.toLowerCase()}`
+                        : 'Not running on this camera. Nothing is being counted through it.'}
+                    </p>
+                    <button
+                      onClick={() => toggleDetection(!runningHere)}
+                      disabled={detectorBusy}
+                      className="w-full px-4 py-2.5 rounded-xl border border-ai-gray-700 text-ai-gray-200 hover:text-white hover:border-ai-gray-500 transition-colors disabled:opacity-50 text-sm font-medium flex items-center justify-center gap-2"
+                    >
+                      {detectorBusy ? (
+                        <Loader className="w-4 h-4 animate-spin" />
+                      ) : runningHere ? (
+                        <Square className="w-4 h-4" />
+                      ) : (
+                        <Play className="w-4 h-4" />
+                      )}
+                      {runningHere ? 'Stop detection' : 'Start detection'}
+                    </button>
+                  </>
+                )}
+
+                {detectorNote && (
+                  <p className="text-xs text-ai-gray-400 break-anywhere">{detectorNote}</p>
+                )}
               </div>
 
               <div className="rounded-xl border border-ai-gray-800 p-4">

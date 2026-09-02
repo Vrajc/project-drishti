@@ -3,6 +3,7 @@ import type { AuthRequest } from '../middleware/auth.middleware.js';
 import * as surveillance from '../services/surveillance.service.js';
 import { ValidationError } from '../services/surveillance.service.js';
 import { runHealthSweep, getLastSweepSummary, config as healthConfig } from '../services/cameraHealth.service.js';
+import * as detector from '../services/detector.service.js';
 
 // Follows the envelope the rest of the API already uses: { success, data } or
 // { success: false, message }.
@@ -324,5 +325,52 @@ export const createSite = async (req: Request, res: Response) => {
     res.status(201).json({ success: true, message: 'Site created', data: site });
   } catch (error: any) {
     fail(res, error, 'Failed to create the site');
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Detection
+// ---------------------------------------------------------------------------
+
+/** A detector that is not configured is a state, not an error. */
+function detectorFail(res: Response, error: any, fallback: string) {
+  if (error?.name === 'DetectorUnavailable') {
+    return res.status(503).json({ success: false, message: error.message });
+  }
+  return fail(res, error, fallback);
+}
+
+export const getDetectionStatus = async (_req: Request, res: Response) => {
+  try {
+    res.status(200).json({ success: true, data: await detector.getDetectorStatus() });
+  } catch (error: any) {
+    detectorFail(res, error, 'Failed to read the detector status');
+  }
+};
+
+export const startCameraDetection = async (req: Request, res: Response) => {
+  try {
+    const result = await detector.startDetection(req.params.id);
+    if (!result) return res.status(404).json({ success: false, message: 'Camera not found' });
+
+    res.status(200).json({
+      success: true,
+      message: result.countingPossible
+        ? `Detection started with ${result.zonesSent} counting zone(s)`
+        : 'Detection started. No zones are defined on this camera, so nothing will be counted until one is.',
+      data: result,
+    });
+  } catch (error: any) {
+    detectorFail(res, error, 'Failed to start detection');
+  }
+};
+
+export const stopCameraDetection = async (req: Request, res: Response) => {
+  try {
+    const result = await detector.stopDetection(req.params.id);
+    if (!result) return res.status(404).json({ success: false, message: 'Camera not found' });
+    res.status(200).json({ success: true, message: 'Detection stopped', data: result });
+  } catch (error: any) {
+    detectorFail(res, error, 'Failed to stop detection');
   }
 };
