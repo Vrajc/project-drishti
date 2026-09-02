@@ -10,6 +10,7 @@ import Navbar from '../components/Navbar';
 import { incidentService, Incident as IncidentType } from '../services/incident.service';
 import crowdAnalysisService from '../services/crowdAnalysis.service';
 import { useToast } from '../components/Toast';
+import { getEventTiming } from '../utils/eventStatus';
 
 interface Incident {
   _id?: string;
@@ -58,21 +59,8 @@ const LiveMonitoring: React.FC = () => {
   // been measured here yet".
   const [avgCrowdDensity, setAvgCrowdDensity] = useState<number | null>(null);
 
-  // Helper function to check if event is live
-  const isEventLive = (date: string, time: string): boolean => {
-    const now = new Date();
-    
-    // Parse the event date and time
-    const eventDate = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    eventDate.setHours(hours, minutes, 0, 0);
-    
-    // Assume event duration is 8 hours (can be made configurable)
-    const eventEndTime = new Date(eventDate.getTime() + (8 * 60 * 60 * 1000));
-    
-    // Check if current time is within event timeframe
-    return now >= eventDate && now <= eventEndTime;
-  };
+  // From the recorded end, not an assumed eight hours after the start.
+  const isEventLive = (candidate: any): boolean => getEventTiming(candidate).phase === 'live';
 
   // Get events based on user role
   const userEvents = user?.role === 'organizer' 
@@ -80,7 +68,7 @@ const LiveMonitoring: React.FC = () => {
     : getUserRegisteredEvents(user?.id || '');
   
   // Find live event
-  const liveEvent = userEvents.find(event => isEventLive(event.date, event.time));
+  const liveEvent = userEvents.find(event => isEventLive(event));
 
   // `mapFile` is `File | string | null` — a freshly-picked File needs an
   // object URL before it can be used as an <img src>, and that URL has to be

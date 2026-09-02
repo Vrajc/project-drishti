@@ -55,6 +55,14 @@ model Event {
   type           String
   date           String
   time           String
+
+  // When it ends. Optional only because events created before this existed have
+  // no end recorded; the setup form requires it now. Without it nothing can say
+  // whether an event is running - every screen used to assume eight hours from
+  // the start time, so an event was "live" for eight hours whatever its actual
+  // length, and the post-event report printed a duration nobody entered.
+  endDate        String?
+  endTime        String?
   crowdSize      Int
   location       String
   description    String?

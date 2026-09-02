@@ -8,6 +8,7 @@ import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
 import { incidentService } from '../services/incident.service';
 import { dispatchService } from '../services/dispatch.service';
+import { getEventTiming } from '../utils/eventStatus';
 
 interface Incident {
   _id?: string;
@@ -58,19 +59,12 @@ const EmergencyDispatch: React.FC = () => {
   const [, setIncidents] = useState<Incident[]>([]);
   const [dispatchError, setDispatchError] = useState<string | null>(null);
 
-  // Helper function to check if event is live
-  const isEventLive = (date: string, time: string): boolean => {
-    const now = new Date();
-    const eventDate = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    eventDate.setHours(hours, minutes, 0, 0);
-    const eventEndTime = new Date(eventDate.getTime() + (8 * 60 * 60 * 1000));
-    return now >= eventDate && now <= eventEndTime;
-  };
+  // From the recorded end, not an assumed eight hours after the start.
+  const isEventLive = (candidate: any): boolean => getEventTiming(candidate).phase === 'live';
 
   // Get organizer's live event
   const organizerEvents = getEventsByOrganizer(user?.email || '');
-  const liveEvent = organizerEvents.find(e => isEventLive(e.date, e.time)) || event;
+  const liveEvent = organizerEvents.find((e) => isEventLive(e)) || event;
 
   // Get dispatch units from event setup
   const eventDispatchUnits = liveEvent?.dispatchUnits || [];

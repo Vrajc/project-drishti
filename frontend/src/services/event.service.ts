@@ -18,6 +18,10 @@ export interface CreateEventData {
   date: string;
   time: string;
   crowdSize: number;
+  /** When the event ends. Required by the form; the column allows null only
+      because events created before it existed have no end to backfill. */
+  endDate?: string;
+  endTime?: string;
   /**
    * Zone name and the capacity density is measured against. The server rejects
    * a zone without a capacity above zero rather than defaulting one, because

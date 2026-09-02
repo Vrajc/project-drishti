@@ -11,6 +11,7 @@ import OrganizerDashboard from './pages/OrganizerDashboard';
 import EventExplore from './pages/EventExplore';
 import MyEvents from './pages/MyEvents';
 import LiveMonitoring from './pages/LiveMonitoring';
+import LiveUpdates from './pages/LiveUpdates';
 import EventSetup from './pages/EventSetup';
 import EventCameras from './pages/EventCameras';
 import PreSafetyPlanning from './pages/PreSafetyPlanning';
@@ -65,29 +66,159 @@ const AnimatedRoutes: React.FC = () => {
         <Route path="/" element={<PageWrapper><Landing /></PageWrapper>} />
         <Route path="/login" element={<PageWrapper><Login /></PageWrapper>} />
         <Route path="/register" element={<PageWrapper><Register /></PageWrapper>} />
-        <Route path="/participant-dashboard" element={<PageWrapper><ParticipantDashboard /></PageWrapper>} />
-        <Route path="/organizer-dashboard" element={<PageWrapper><OrganizerDashboard /></PageWrapper>} />
-        <Route path="/explore-events" element={<PageWrapper><EventExplore /></PageWrapper>} />
-        <Route path="/my-events" element={<PageWrapper><MyEvents /></PageWrapper>} />
-        <Route path="/live-monitoring" element={<PageWrapper><LiveMonitoring /></PageWrapper>} />
-        <Route path="/event-setup" element={<PageWrapper><EventSetup /></PageWrapper>} />
-        <Route path="/event-cameras" element={<PageWrapper><EventCameras /></PageWrapper>} />
-        <Route path="/pre-safety-planning" element={<PageWrapper><PreSafetyPlanning /></PageWrapper>} />
-        <Route path="/crowd-flow-analysis" element={<PageWrapper><CrowdFlowAnalysis /></PageWrapper>} />
-        <Route path="/anomaly-detection" element={<PageWrapper><AnomalyDetection /></PageWrapper>} />
-        <Route path="/emergency-dispatch" element={<PageWrapper><EmergencyDispatch /></PageWrapper>} />
-        <Route path="/ai-summaries" element={<PageWrapper><AISummaries /></PageWrapper>} />
-        <Route path="/post-event-reports" element={<PageWrapper><PostEventReports /></PageWrapper>} />
-        <Route path="/admin-dashboard" element={<PageWrapper><AdminDashboard /></PageWrapper>} />
-        <Route path="/surveillance/cameras" element={<PageWrapper><CameraRegistry /></PageWrapper>} />
-        <Route path="/surveillance/map" element={<PageWrapper><CameraMap /></PageWrapper>} />
-        <Route path="/surveillance/live-wall" element={<PageWrapper><LiveWall /></PageWrapper>} />
+        <Route
+          path="/participant-dashboard"
+          element={
+            <RequireRole roles={['participant']}>
+              <PageWrapper><ParticipantDashboard /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/organizer-dashboard"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><OrganizerDashboard /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/explore-events"
+          element={
+            <RequireRole roles={['participant', 'organizer', 'admin']}>
+              <PageWrapper><EventExplore /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/my-events"
+          element={
+            <RequireRole roles={['participant', 'organizer', 'admin']}>
+              <PageWrapper><MyEvents /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        {/* The attendee's own live view. The participant dashboard used to send
+            them to /live-monitoring, the organizer's operations console. */}
+        <Route
+          path="/live-updates"
+          element={
+            <RequireRole roles={['participant', 'organizer', 'admin']}>
+              <PageWrapper><LiveUpdates /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/live-monitoring"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><LiveMonitoring /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/event-setup"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><EventSetup /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/event-cameras"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><EventCameras /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/pre-safety-planning"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><PreSafetyPlanning /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/crowd-flow-analysis"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><CrowdFlowAnalysis /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/anomaly-detection"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><AnomalyDetection /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/emergency-dispatch"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><EmergencyDispatch /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/ai-summaries"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><AISummaries /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/post-event-reports"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><PostEventReports /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/admin-dashboard"
+          element={
+            <RequireRole roles={['admin']}>
+              <PageWrapper><AdminDashboard /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/surveillance/cameras"
+          element={
+            <RequireRole roles={['police', 'admin']}>
+              <PageWrapper><CameraRegistry /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/surveillance/map"
+          element={
+            <RequireRole roles={['police', 'admin']}>
+              <PageWrapper><CameraMap /></PageWrapper>
+            </RequireRole>
+          }
+        />
+        <Route
+          path="/surveillance/live-wall"
+          element={
+            <RequireRole roles={['police', 'admin']}>
+              <PageWrapper><LiveWall /></PageWrapper>
+            </RequireRole>
+          }
+        />
 
-        {/* Police operations. These are the first routes in the app that can
-            change something in the field, so they are the first to be guarded.
-            The server authorises every call regardless; this is the client-side
-            half, so a signed-out user lands on /login rather than on a page that
-            403s on every request. */}
+        {/* Police operations. Every route above is guarded too: a participant
+            could previously open the admin dashboard, the camera registry and
+            the organizer's monitoring console by typing the URL. The server
+            authorises every call regardless - this is the client-side half, so
+            a signed-out user lands on /login and a signed-in one gets a plain
+            refusal instead of a screen of failed requests. */}
         <Route
           path="/police/dispatch"
           element={

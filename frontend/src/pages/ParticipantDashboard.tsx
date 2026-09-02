@@ -9,6 +9,7 @@ import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import ParticleHero from '../components/ParticleHero';
 import { incidentService } from '../services/incident.service';
+import { getEventTiming } from '../utils/eventStatus';
 
 const ParticipantDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -84,31 +85,19 @@ const ParticipantDashboard: React.FC = () => {
     };
   })();
 
-  const getEventStatus = (date: string, time: string): 'upcoming' | 'live' | 'past' => {
-    const now = new Date();
-    
-    // Parse the event date and time
-    const eventDate = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    eventDate.setHours(hours, minutes, 0, 0);
-    
-    // Assume event duration is 8 hours (can be made configurable)
-    const eventEndTime = new Date(eventDate.getTime() + (8 * 60 * 60 * 1000));
-    
-    // Check if current time is within event timeframe
-    if (now >= eventDate && now <= eventEndTime) {
-      return 'live';
-    } else if (now < eventDate) {
-      return 'upcoming';
-    }
-    return 'past';
+  // 'unknown' rather than 'past': an event whose end nobody recorded has not
+  // been shown to be over, and quietly filing it as finished hides events that
+  // are still running.
+  const getEventStatus = (event: any): 'upcoming' | 'live' | 'past' | 'unknown' => {
+    const phase = getEventTiming(event).phase;
+    return phase === 'ended' ? 'past' : phase;
   };
 
   const upcomingEvents = registeredEvents.slice(0, 2).map(event => ({
     name: event.name,
     date: event.date,
     location: event.location,
-    status: getEventStatus(event.date, event.time)
+    status: getEventStatus(event)
   }));
 
   const hasLiveEvent = upcomingEvents.some(event => event.status === 'live');
@@ -131,15 +120,19 @@ const ParticipantDashboard: React.FC = () => {
     {
       icon: Eye,
       title: 'Live Updates',
-      description: hasLiveEvent ? 'Get real-time updates and safety information during live events' : 'No live events - Register for an event first',
-      path: '/live-monitoring',
+      description: hasLiveEvent
+        ? "Your event's status, and anything reported on it"
+        : 'Open once one of your events is running',
+      path: '/live-updates',
       enabled: hasLiveEvent
     },
     {
       icon: AlertTriangle,
       title: 'Emergency Report',
-      description: hasLiveEvent ? 'Report incidents or emergencies during events' : 'Only available during live events',
-      path: '/live-monitoring',
+      description: hasLiveEvent
+        ? "Report an incident to the event's safety team"
+        : 'Open once one of your events is running',
+      path: '/live-updates',
       enabled: hasLiveEvent
     }
   ];
@@ -268,7 +261,7 @@ const ParticipantDashboard: React.FC = () => {
                     transition={{ delay: 0.4 + (0.1 * index) }}
                     whileHover={{ x: 4 }}
                     className="bg-ai-gray-900/50 rounded-xl p-4 sm:p-5 border border-ai-gray-800 hover:border-ai-gray-700 transition-all duration-300 group/event cursor-pointer"
-                    onClick={() => event.status === 'live' && navigate('/live-monitoring')}
+                    onClick={() => event.status === 'live' && navigate('/live-updates')}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex-1 min-w-0">

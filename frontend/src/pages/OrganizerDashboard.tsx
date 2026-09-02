@@ -9,6 +9,7 @@ import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import ParticleHero from '../components/ParticleHero';
 import { incidentService } from '../services/incident.service';
+import { getEventTiming } from '../utils/eventStatus';
 
 const OrganizerDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -21,28 +22,16 @@ const OrganizerDashboard: React.FC = () => {
   const organizerEvents = getEventsByOrganizer(user?.email || '');
 
   // Check if an event is currently live
-  const getEventStatus = (date: string, time: string): 'upcoming' | 'live' | 'past' => {
-    const now = new Date();
-    
-    // Parse the event date and time
-    const eventDate = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    eventDate.setHours(hours, minutes, 0, 0);
-    
-    // Assume event duration is 8 hours (can be made configurable)
-    const eventEndTime = new Date(eventDate.getTime() + (8 * 60 * 60 * 1000));
-    
-    // Check if current time is within event timeframe
-    if (now >= eventDate && now <= eventEndTime) {
-      return 'live';
-    } else if (now < eventDate) {
-      return 'upcoming';
-    }
-    return 'past';
+  // 'unknown' rather than 'past': an event whose end nobody recorded has not
+  // been shown to be over, and quietly filing it as finished hides events that
+  // are still running.
+  const getEventStatus = (event: any): 'upcoming' | 'live' | 'past' | 'unknown' => {
+    const phase = getEventTiming(event).phase;
+    return phase === 'ended' ? 'past' : phase;
   };
 
   // Get live and upcoming events
-  const liveEvents = organizerEvents.filter(e => getEventStatus(e.date, e.time) === 'live');
+  const liveEvents = organizerEvents.filter(e => getEventStatus(e) === 'live');
   const hasLiveEvent = liveEvents.length > 0;
 
   // Load active incidents count and average response time for live events
@@ -216,7 +205,7 @@ const OrganizerDashboard: React.FC = () => {
               <div className="relative z-10">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-6">
                   <h3 className="text-lg sm:text-xl font-semibold text-ai-white tracking-wide">Current Event</h3>
-                  {getEventStatus(event.date, event.time) === 'live' && (
+                  {getEventStatus(event) === 'live' && (
                     <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-ai-white/10 text-ai-white rounded-full text-xs sm:text-sm font-medium flex items-center gap-2 border border-ai-gray-700 shrink-0">
                       <div className="w-2.5 h-2.5 bg-ai-white rounded-full animate-pulse" />
                       LIVE NOW

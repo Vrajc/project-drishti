@@ -10,6 +10,7 @@ import { generateEventReport } from '../services/ai.service';
 import { generatePDFReport } from '../utils/pdfGenerator';
 import { incidentService } from '../services/incident.service';
 import { useToast } from '../components/Toast';
+import { getEventTiming } from '../utils/eventStatus';
 
 const PostEventReports: React.FC = () => {
   const { event } = useEvent();
@@ -81,10 +82,10 @@ const PostEventReports: React.FC = () => {
   const eventData = event ? {
     name: event.name,
     date: event.date,
-    // The schema records a start date and time but no end, so a duration would
-    // have to be assumed. It was previously the string '8 hours' on every
-    // report regardless of the event.
-    duration: 'Not recorded',
+    // Real, when the organizer recorded an end. Events created before that
+    // column existed still have none, and the report says so rather than
+    // printing the '8 hours' it used to print for every event ever held.
+    duration: getEventTiming(event).duration ?? 'Not recorded',
     attendance: event.registeredUsers?.length || 0,
     zones: event.zones.length,
     incidents: metrics.total,

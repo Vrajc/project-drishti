@@ -12,6 +12,7 @@ import { getUserStats, type UserStats } from '../services/user.service';
 import { getRegistryStats, type RegistryStats } from '../services/surveillance.service';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { getEventTiming } from '../utils/eventStatus';
 
 const AdminDashboard: React.FC = () => {
   const { getAllEvents, deleteEvent } = useEvent();
@@ -82,43 +83,27 @@ const AdminDashboard: React.FC = () => {
     return () => clearInterval(intervalId);
   }, [allEvents.length]);
 
-  // Helper function to check if event is live
-  const isEventLive = (date: string, time: string): boolean => {
-    const now = new Date();
+  // Live means running now, from the end the organizer recorded. An event with
+  // no end recorded is never counted as live: it is unknown, not running.
+  const isEventLive = (event: any): boolean => getEventTiming(event).phase === 'live';
 
-    // Parse the event date and time
-    const eventDate = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    eventDate.setHours(hours, minutes, 0, 0);
-    
-    // Assume event duration is 8 hours (can be made configurable)
-    const eventEndTime = new Date(eventDate.getTime() + (8 * 60 * 60 * 1000));
-    
-    // Check if current time is within event timeframe
-    return now >= eventDate && now <= eventEndTime;
-  };
-
-  const getEventStatus = (date: string, time: string): 'upcoming' | 'live' | 'completed' => {
-    const now = new Date();
-    const eventDate = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    eventDate.setHours(hours, minutes, 0, 0);
-    const eventEndTime = new Date(eventDate.getTime() + (8 * 60 * 60 * 1000));
-    
-    if (now >= eventDate && now <= eventEndTime) return 'live';
-    if (now < eventDate) return 'upcoming';
-    return 'completed';
+  // 'unknown' is its own answer: an event with no recorded end is neither
+  // running nor finished as far as anything here can tell, and counting it as
+  // completed would quietly close events that are still going on.
+  const getEventStatus = (event: any): 'upcoming' | 'live' | 'completed' | 'unknown' => {
+    const phase = getEventTiming(event).phase;
+    return phase === 'ended' ? 'completed' : phase;
   };
 
   // Event and incident figures derived from what is already loaded; user and
   // camera counts come from the queries above.
   const systemStats = useMemo(() => {
     // Calculate event statuses using proper time-based logic
-    const liveEvents = allEvents.filter(e => isEventLive(e.date, e.time));
+    const liveEvents = allEvents.filter(e => isEventLive(e));
 
-    const upcomingEvents = allEvents.filter(e => getEventStatus(e.date, e.time) === 'upcoming');
+    const upcomingEvents = allEvents.filter(e => getEventStatus(e) === 'upcoming');
 
-    const completedEvents = allEvents.filter(e => getEventStatus(e.date, e.time) === 'completed');
+    const completedEvents = allEvents.filter(e => getEventStatus(e) === 'completed');
 
     // Calculate incident statistics
     const openIncidents = allIncidents.filter(inc => inc.status === 'open').length;
@@ -175,7 +160,7 @@ const AdminDashboard: React.FC = () => {
 
   const eventsWithStatus = useMemo(() => {
     return allEvents.map(event => {
-      const status = getEventStatus(event.date, event.time);
+      const status = getEventStatus(event);
       
       // Count incidents for this event
       const eventIncidents = allIncidents.filter(inc => inc.eventId === event.id);

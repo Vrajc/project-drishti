@@ -44,6 +44,9 @@ export interface Event {
   type: string;
   date: string;
   time: string;
+  /** When it ends. Null on events created before the column existed. */
+  endDate?: string | null;
+  endTime?: string | null;
   crowdSize: number;
   zones: Zone[];
   cameras: Camera[];
@@ -154,6 +157,8 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
           type: e.type,
           date: e.date,
           time: e.time,
+          endDate: e.endDate ?? null,
+          endTime: e.endTime ?? null,
           crowdSize: e.crowdSize,
           zones: normaliseZones(e.zones),
           cameras: e.cameras,

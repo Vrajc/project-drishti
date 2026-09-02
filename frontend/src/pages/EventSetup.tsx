@@ -43,6 +43,8 @@ const EventSetup: React.FC = () => {
     type: '',
     date: '',
     time: '',
+    endDate: '',
+    endTime: '',
     crowdSize: 1000,
     zones: [] as ZoneDraft[],
     dispatchUnits: [] as DispatchUnit[],
@@ -74,6 +76,15 @@ const EventSetup: React.FC = () => {
     
     if (!user?.email) {
       toast.error('You are not signed in', 'Sign in again and retry.');
+      return;
+    }
+
+    // The end has to be after the start, or "live" and the reported duration
+    // become nonsense for the life of the event.
+    const startsAt = new Date(`${formData.date}T${formData.time}`);
+    const endsAt = new Date(`${formData.endDate}T${formData.endTime}`);
+    if (Number.isFinite(startsAt.getTime()) && Number.isFinite(endsAt.getTime()) && endsAt <= startsAt) {
+      toast.error('The event ends before it starts', 'Check the end date and time.');
       return;
     }
 
@@ -256,12 +267,45 @@ const EventSetup: React.FC = () => {
                 <div>
                   <label className="block text-sm font-medium text-ai-gray-300 mb-2">
                     <Clock className="w-4 h-4 inline mr-2" />
-                    Time
+                    Start time
                   </label>
                   <input
                     type="time"
                     value={formData.time}
                     onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    className="w-full px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white focus:border-ai-white focus:outline-none transition-colors"
+                    required
+                  />
+                </div>
+
+                {/* When it ends. Nothing recorded this, so every screen assumed
+                    eight hours from the start: a two-hour talk showed as live
+                    for eight, a festival went dark after its first evening, and
+                    the post-event report printed a duration nobody entered. */}
+                <div>
+                  <label className="block text-sm font-medium text-ai-gray-300 mb-2">
+                    <Calendar className="w-4 h-4 inline mr-2" />
+                    End date
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.endDate}
+                    min={formData.date || undefined}
+                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                    className="w-full px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white focus:border-ai-white focus:outline-none transition-colors"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-ai-gray-300 mb-2">
+                    <Clock className="w-4 h-4 inline mr-2" />
+                    End time
+                  </label>
+                  <input
+                    type="time"
+                    value={formData.endTime}
+                    onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
                     className="w-full px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white focus:border-ai-white focus:outline-none transition-colors"
                     required
                   />

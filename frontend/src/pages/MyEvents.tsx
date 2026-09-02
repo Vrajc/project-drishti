@@ -7,6 +7,7 @@ import { useEvent } from '../contexts/EventContext';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
+import { getEventTiming } from '../utils/eventStatus';
 
 
 const MyEvents: React.FC = () => {
@@ -16,24 +17,10 @@ const MyEvents: React.FC = () => {
 
   const registeredEvents = getUserRegisteredEvents(user?.id || '');
 
-  const getEventStatus = (date: string, time: string): 'upcoming' | 'live' | 'completed' => {
-    const now = new Date();
-    
-    // Parse the event date and time
-    const eventDate = new Date(date);
-    const [hours, minutes] = time.split(':').map(Number);
-    eventDate.setHours(hours, minutes, 0, 0);
-    
-    // Assume event duration is 8 hours (can be made configurable)
-    const eventEndTime = new Date(eventDate.getTime() + (8 * 60 * 60 * 1000));
-    
-    // Check if current time is within event timeframe
-    if (now >= eventDate && now <= eventEndTime) {
-      return 'live';
-    } else if (now < eventDate) {
-      return 'upcoming';
-    }
-    return 'completed';
+  const getEventStatus = (event: any): 'upcoming' | 'live' | 'completed' | 'unknown' => {
+    const timing = getEventTiming(event);
+    if (timing.phase === 'ended') return 'completed';
+    return timing.phase;
   };
 
   const getStatusColor = (status: string) => {
@@ -111,21 +98,21 @@ const MyEvents: React.FC = () => {
 
             <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-2">
-                {registeredEvents.filter(e => getEventStatus(e.date, e.time) === 'live').length}
+                {registeredEvents.filter(e => getEventStatus(e) === 'live').length}
               </div>
               <div className="text-caption text-xs sm:text-sm text-ai-gray-400">Live Now</div>
             </div>
 
             <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <div className="text-2xl sm:text-3xl font-bold text-ai-gray-300 mb-2">
-                {registeredEvents.filter(e => getEventStatus(e.date, e.time) === 'upcoming').length}
+                {registeredEvents.filter(e => getEventStatus(e) === 'upcoming').length}
               </div>
               <div className="text-caption text-xs sm:text-sm text-ai-gray-400">Upcoming</div>
             </div>
 
             <div className="glass-light rounded-2xl p-4 sm:p-6 text-center">
               <div className="text-2xl sm:text-3xl font-bold text-ai-gray-500 mb-2">
-                {registeredEvents.filter(e => getEventStatus(e.date, e.time) === 'completed').length}
+                {registeredEvents.filter(e => getEventStatus(e) === 'completed').length}
               </div>
               <div className="text-caption text-xs sm:text-sm text-ai-gray-400">Completed</div>
             </div>
@@ -155,7 +142,7 @@ const MyEvents: React.FC = () => {
           ) : (
             <div className="space-y-4 sm:space-y-6">
               {registeredEvents.map((event, index) => {
-                const status = getEventStatus(event.date, event.time);
+                const status = getEventStatus(event);
                 return (
                 <motion.div
                   key={event.id}

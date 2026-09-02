@@ -63,6 +63,8 @@ export const createEvent = async (req: Request, res: Response) => {
       type,
       date,
       time,
+      endDate,
+      endTime,
       crowdSize,
       zones,
       dispatchUnits,
@@ -88,6 +90,10 @@ export const createEvent = async (req: Request, res: Response) => {
         type,
         date,
         time,
+        // Blank rather than absent means the form did not collect one; either
+        // way it is stored as null and read as "not recorded".
+        endDate: endDate || null,
+        endTime: endTime || null,
         crowdSize: Number(crowdSize),
         location,
         description,
