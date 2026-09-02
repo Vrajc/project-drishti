@@ -139,8 +139,10 @@ export const generateEventReport = async (eventData: {
   duration: string;
   attendance: number;
   incidents: number;
-  safetyScore: number;
-  responseTime: number;
+  /** Percentage of incidents resolved. Null when there were none to resolve. */
+  resolutionRate: number | null;
+  /** Mean minutes over resolved incidents. Null when none carry a time. */
+  responseTime: number | null;
   zones?: string[];
 }): Promise<{ success: boolean; report: string }> => {
   try {

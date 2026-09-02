@@ -394,8 +394,10 @@ export async function generateSafetyReport(eventData: {
   date: string;
   attendance: number;
   incidents: number;
-  safetyScore: number;
-  responseTime: number;
+  /** Percentage of incidents resolved. Null when there were none to resolve. */
+  resolutionRate: number | null;
+  /** Mean minutes over resolved incidents. Null when none carry a time. */
+  responseTime: number | null;
   zones?: string[];
 }): Promise<string> {
   try {
@@ -406,8 +408,8 @@ EVENT INFORMATION:
 - Date: ${eventData.date}
 - Total Attendance: ${eventData.attendance.toLocaleString()} people
 - Total Incidents: ${eventData.incidents}
-- Overall Safety Score: ${eventData.safetyScore}/100
-- Average Response Time: ${eventData.responseTime} minutes
+- Incident Resolution Rate: ${eventData.resolutionRate === null ? 'not recorded' : `${eventData.resolutionRate}%`}
+- Average Response Time: ${eventData.responseTime === null ? 'not recorded' : `${eventData.responseTime} minutes`}
 ${eventData.zones ? `- Event Zones: ${eventData.zones.join(', ')}` : ''}
 
 GENERATE A PROFESSIONAL REPORT WITH:
@@ -418,11 +420,9 @@ GENERATE A PROFESSIONAL REPORT WITH:
 - Major concerns or areas for improvement
 - Compliance status with safety regulations
 
-## 2. ATTENDANCE & CROWD MANAGEMENT
-- Attendance statistics and trends
-- Peak occupancy times and levels
-- Crowd flow effectiveness
-- Bottleneck incidents and resolution
+## 2. ATTENDANCE
+- Registered attendance against the zones listed above
+- Crowd-management observations that follow from the incident record only
 
 ## 3. INCIDENT ANALYSIS
 - Total incident breakdown by category
@@ -438,41 +438,34 @@ GENERATE A PROFESSIONAL REPORT WITH:
 - Resource utilization (medical, security, crowd control)
 - Emergency protocol adherence
 
-## 5. SAFETY INFRASTRUCTURE ASSESSMENT
-- Emergency exit utilization
-- Security camera coverage effectiveness
-- Medical post accessibility and response
-- Crowd control barrier placement
+## 5. KEY LEARNINGS & INSIGHTS
+- What the incident record shows working well
+- Challenges evidenced by the incidents above
 
-## 6. PREDICTIVE ANALYSIS ACCURACY
-- AI prediction accuracy vs actual outcomes
-- Early warning system effectiveness
-- Anomaly detection success rate
-
-## 7. KEY LEARNINGS & INSIGHTS
-- What worked exceptionally well
-- Unexpected challenges encountered
-- Staff performance highlights
-- Technology system effectiveness
-
-## 8. RECOMMENDATIONS FOR FUTURE EVENTS
+## 6. RECOMMENDATIONS FOR FUTURE EVENTS
 - Critical improvements needed
 - Infrastructure upgrades recommended
 - Staffing adjustments suggested
 - Protocol modifications
 - Technology enhancements
 
-## 9. COMPLIANCE & REGULATORY NOTES
-- Safety regulation compliance status
-- Documentation completeness
-- Legal requirements met
-
-## 10. CONCLUSION
-- Overall assessment
-- Certification recommendation
+## 7. CONCLUSION
+- Overall assessment supported by the data above
 - Next steps
 
-Format using professional Markdown with clear sections, bullet points, and data visualization suggestions. Include specific numbers, percentages, and actionable recommendations. Tone should be objective, professional, and data-driven.`;
+CRITICAL - THIS REPORT GOES TO A PUBLIC SAFETY AUTHORITY:
+- Use ONLY the figures given above. Do not invent, estimate or illustrate any
+  number, percentage, time, location or rate that is not stated in EVENT
+  INFORMATION, and do not restate a given figure as a different one.
+- Where a figure reads "not recorded", write that it was not recorded. Do not
+  substitute a plausible value and do not reason as though one exists.
+- Do not assess crowd density, occupancy curves, camera coverage, prediction
+  accuracy, staffing levels or regulatory compliance: this report carries no
+  data on any of them.
+- Draw every observation and recommendation from the incidents and zones above.
+  If the record is too thin to support a section, say so in one line and move on.
+
+Format using professional Markdown with clear sections and bullet points. Tone should be objective, professional, and strictly evidence-based.`;
 
     const model = genAI.getGenerativeModel({ 
       model: 'gemini-2.5-flash',

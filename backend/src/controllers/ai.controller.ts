@@ -188,6 +188,13 @@ export const analyzeCrowdFlow = async (req: Request, res: Response) => {
   }
 };
 
+/** Absent, blank and unparseable all mean "not recorded" - never zero. */
+const toNullableNumber = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
 /**
  * Generate post-event report
  */
@@ -198,7 +205,7 @@ export const generateEventReport = async (req: Request, res: Response) => {
       date,
       attendance,
       incidents,
-      safetyScore,
+      resolutionRate,
       responseTime,
       zones
     } = req.body;
@@ -214,8 +221,11 @@ export const generateEventReport = async (req: Request, res: Response) => {
       date,
       attendance: Number(attendance) || 0,
       incidents: Number(incidents) || 0,
-      safetyScore: Number(safetyScore) || 0,
-      responseTime: Number(responseTime) || 0,
+      // A figure the event never recorded stays absent. `Number(x) || 0` used
+      // to turn "no incidents to resolve" into a safety score of zero, which
+      // the model then wrote up as a finding against the event.
+      resolutionRate: toNullableNumber(resolutionRate),
+      responseTime: toNullableNumber(responseTime),
       zones: zones || []
     });
 

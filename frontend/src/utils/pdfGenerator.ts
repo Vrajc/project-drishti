@@ -4,12 +4,15 @@ import autoTable from 'jspdf-autotable';
 interface EventData {
   name: string;
   date: string;
+  /** 'not recorded' when the event has no end time stored. */
   duration: string;
   attendance: number;
   zones: number;
   incidents: number;
-  responseTime: number;
-  safetyScore: number;
+  /** Mean minutes over incidents that were genuinely resolved. Null when none were. */
+  responseTime: number | null;
+  /** Percentage of incidents resolved. Null when there were no incidents. */
+  resolutionRate: number | null;
 }
 
 interface IncidentData {
@@ -32,6 +35,15 @@ export const generatePDFReport = (data: ReportData) => {
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   let yPosition = 20;
+
+  // A report handed to an authority states what was measured, or says the
+  // figure was not recorded. It never fills a gap with a plausible number.
+  const NOT_RECORDED = 'Not recorded';
+  const asPercent = (value: number | null) =>
+    value === null ? NOT_RECORDED : `${value}%`;
+  const asMinutes = (value: number | null) =>
+    value === null ? NOT_RECORDED : `${value.toFixed(1)} minutes`;
+  const resolvedCount = data.incidents.filter(i => i.status === 'resolved').length;
 
   // Helper function to check if we need a new page
   const checkNewPage = (requiredSpace: number) => {
@@ -109,9 +121,9 @@ export const generatePDFReport = (data: ReportData) => {
     ['Duration', data.eventData.duration],
     ['Total Attendees', data.eventData.attendance.toLocaleString()],
     ['Safety Zones', data.eventData.zones.toString()],
-    ['Overall Safety Score', `${data.eventData.safetyScore}/100`],
     ['Total Incidents', data.eventData.incidents.toString()],
-    ['Avg Response Time', `${data.eventData.responseTime} minutes`]
+    ['Incident Resolution Rate', asPercent(data.eventData.resolutionRate)],
+    ['Avg Response Time', asMinutes(data.eventData.responseTime)]
   ];
 
   autoTable(doc, {
@@ -140,12 +152,13 @@ export const generatePDFReport = (data: ReportData) => {
   yPosition += 8;
 
   doc.setFont('helvetica', 'normal');
-  const kpiText = [
-    `✓ Safety Score: ${data.eventData.safetyScore}/100 - ${data.eventData.safetyScore >= 90 ? 'Excellent' : data.eventData.safetyScore >= 75 ? 'Good' : 'Needs Improvement'}`,
-    `✓ Incident Resolution: 100% - All incidents resolved successfully`,
-    `✓ Response Efficiency: 94% - Above industry standard`,
-    `✓ Zero Tolerance: Met - No major safety violations reported`
-  ];
+  const kpiText = data.eventData.incidents === 0
+    ? ['• No incidents were recorded against this event.']
+    : [
+        `• Incidents recorded: ${data.eventData.incidents}`,
+        `• Incidents resolved: ${resolvedCount} (${asPercent(data.eventData.resolutionRate)})`,
+        `• Mean response time, over resolved incidents: ${asMinutes(data.eventData.responseTime)}`
+      ];
 
   kpiText.forEach(text => {
     doc.text(text, 25, yPosition);
@@ -250,11 +263,8 @@ export const generatePDFReport = (data: ReportData) => {
   doc.setFont('helvetica', 'normal');
   
   const crowdData = [
-    ['Peak Attendance', data.eventData.attendance.toLocaleString()],
-    ['Average Crowd Density', '68%'],
-    ['Bottlenecks Identified', '3'],
-    ['Peak Activity Hour', '8:00 PM'],
-    ['Flow Efficiency', '87%']
+    ['Registered Attendees', data.eventData.attendance.toLocaleString()],
+    ['Safety Zones', data.eventData.zones.toString()]
   ];
 
   autoTable(doc, {
@@ -275,14 +285,18 @@ export const generatePDFReport = (data: ReportData) => {
   yPosition = (doc as any).lastAutoTable.finalY + 10;
 
   doc.setFontSize(10);
-  doc.text('Key Observations:', 20, yPosition);
-  yPosition += 7;
-  doc.text('• Main stage entrance experienced highest density during headline performances', 25, yPosition);
-  yPosition += 6;
-  doc.text('• Food court areas required additional crowd management during peak hours', 25, yPosition);
-  yPosition += 6;
-  doc.text('• Emergency exit pathways maintained clear throughout the event', 25, yPosition);
-  yPosition += 15;
+  // Density, bottleneck and flow figures are not retained once an event ends,
+  // so this section says so rather than printing representative-looking ones.
+  doc.splitTextToSize(
+    'Crowd density, bottleneck and flow-efficiency analytics are not retained after an event ' +
+    'closes. No figures for them are stated in this report.',
+    pageWidth - 45
+  ).forEach((line: string) => {
+    checkNewPage(6);
+    doc.text(line, 25, yPosition);
+    yPosition += 6;
+  });
+  yPosition += 9;
 
   // ===============================
   // EMERGENCY RESPONSE
@@ -290,11 +304,9 @@ export const generatePDFReport = (data: ReportData) => {
   addSectionHeader('EMERGENCY RESPONSE');
 
   const responseData = [
-    ['Total Dispatches', data.incidents.length.toString()],
-    ['Average Response Time', `${data.eventData.responseTime} minutes`],
-    ['First Response Success Rate', '94%'],
-    ['Emergency Units Deployed', '6'],
-    ['Optimal Routing Efficiency', '96%']
+    ['Incidents Recorded', data.eventData.incidents.toString()],
+    ['Incidents Resolved', resolvedCount.toString()],
+    ['Average Response Time', asMinutes(data.eventData.responseTime)]
   ];
 
   autoTable(doc, {
@@ -315,14 +327,16 @@ export const generatePDFReport = (data: ReportData) => {
   yPosition = (doc as any).lastAutoTable.finalY + 10;
 
   doc.setFontSize(10);
-  doc.text('Response Team Performance:', 20, yPosition);
-  yPosition += 7;
-  doc.text('• All emergency responses were within acceptable timeframes', 25, yPosition);
-  yPosition += 6;
-  doc.text('• Medical teams demonstrated excellent coordination', 25, yPosition);
-  yPosition += 6;
-  doc.text('• Security response times exceeded industry standards', 25, yPosition);
-  yPosition += 15;
+  doc.splitTextToSize(
+    'The average above covers only incidents that were both resolved and carry a recorded ' +
+    'response time. Unit deployment and routing efficiency are not tracked per incident.',
+    pageWidth - 45
+  ).forEach((line: string) => {
+    checkNewPage(6);
+    doc.text(line, 25, yPosition);
+    yPosition += 6;
+  });
+  yPosition += 9;
 
   // ===============================
   // AI RECOMMENDATIONS
@@ -331,59 +345,31 @@ export const generatePDFReport = (data: ReportData) => {
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
-  doc.text('Data-driven insights for future event improvements:', 20, yPosition);
-  yPosition += 10;
 
-  const recommendations = [
-    {
-      priority: 'High',
-      recommendation: 'Increase crowd control barriers at main stage entrance',
-      impact: 'Reduce bottleneck congestion by 40%'
-    },
-    {
-      priority: 'High',
-      recommendation: 'Deploy additional medical staff during peak hours (7-9 PM)',
-      impact: 'Improve response time by 25%'
-    },
-    {
-      priority: 'Medium',
-      recommendation: 'Enhance emergency exit signage visibility',
-      impact: 'Improve evacuation efficiency'
-    },
-    {
-      priority: 'Medium',
-      recommendation: 'Add food vendors to reduce queue times',
-      impact: 'Better crowd distribution'
-    }
-  ];
-
-  recommendations.forEach((rec, index) => {
-    checkNewPage(25);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`${index + 1}. ${rec.recommendation}`, 25, yPosition);
-    yPosition += 6;
-    doc.setFont('helvetica', 'normal');
-    doc.text(`   Priority: ${rec.priority} | Expected Impact: ${rec.impact}`, 25, yPosition);
-    yPosition += 8;
-  });
-
-  yPosition += 5;
-
-  // Add AI-generated insights if available
+  // The recommendations here used to be a fixed list - barriers at the main
+  // stage, more medical staff at 7-9 PM - printed for every event whether or
+  // not any of it applied. The only recommendations this platform can honestly
+  // attribute to an event are the ones the model wrote about that event.
   if (data.aiReport) {
-    checkNewPage(30);
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('AI-Generated Insights', 20, yPosition);
-    yPosition += 8;
+    doc.text("Generated from this event's recorded incidents and zones:", 20, yPosition);
+    yPosition += 10;
 
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
     const lines = doc.splitTextToSize(data.aiReport, pageWidth - 40);
     lines.forEach((line: string) => {
       checkNewPage(6);
       doc.text(line, 20, yPosition);
       yPosition += 5;
+    });
+  } else {
+    doc.splitTextToSize(
+      'Automated analysis was unavailable when this report was generated, so it carries no ' +
+      'recommendations. Re-generating the report once analysis is available will include them.',
+      pageWidth - 40
+    ).forEach((line: string) => {
+      checkNewPage(6);
+      doc.text(line, 20, yPosition);
+      yPosition += 6;
     });
   }
 
@@ -396,22 +382,19 @@ export const generatePDFReport = (data: ReportData) => {
 
   doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
+  // This section previously certified the deployment as GDPR compliant and ISO
+  // 27001 / SOC 2 Type II certified. A report cannot award its own operator an
+  // audit certification, so it now states the platform's data-handling design
+  // and leaves the compliance position to whoever runs the deployment.
   const privacyText = [
-    'All personal data collected during the event has been processed in accordance with applicable',
-    'privacy regulations, including GDPR and local data protection laws.',
+    'This report is generated from incident and zone records held by the Drishti platform.',
+    'Responsibility for the lawful basis, retention policy and regulatory position of this',
+    'deployment rests with the operating authority, not with this document.',
     '',
     'Data Handling:',
     '• Personal information minimized to essential safety requirements only',
-    '• All data encrypted during transmission and storage',
-    '• Access restricted to authorized personnel only',
-    '• Sensitive data will be retained only as required by law',
-    '• Automated deletion scheduled 30 days post-event',
-    '',
-    'Compliance Certifications:',
-    '✓ GDPR Compliant',
-    '✓ ISO 27001 Information Security',
-    '✓ SOC 2 Type II Certified',
-    '✓ Data Minimization Principles Applied'
+    '• Access restricted to authenticated, authorized personnel',
+    "• Incident records retained under the operator's configured retention policy"
   ];
 
   privacyText.forEach(text => {

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { FileText, Download, Shield, Users, AlertTriangle, Clock, Calendar, BarChart3 } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
@@ -8,6 +8,7 @@ import Navbar from '../components/Navbar';
 import DataTable from '../components/DataTable';
 import { generateEventReport } from '../services/ai.service';
 import { generatePDFReport } from '../utils/pdfGenerator';
+import { incidentService } from '../services/incident.service';
 
 const PostEventReports: React.FC = () => {
   const { event } = useEvent();
@@ -17,28 +18,98 @@ const PostEventReports: React.FC = () => {
   // Check if event is completed (date has passed)
   const isEventCompleted = event && new Date(event.date) < new Date();
 
-  // Use real event data or show empty state
+  // Incidents actually recorded against this event. A report handed to an
+  // authority is the last place a number should be invented, so everything
+  // below is computed from these rows or reported as unavailable.
+  const [incidents, setIncidents] = useState<any[]>([]);
+  const [incidentsLoaded, setIncidentsLoaded] = useState(false);
+  const [incidentsError, setIncidentsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!event?.id) {
+      setIncidents([]);
+      setIncidentsLoaded(true);
+      return;
+    }
+
+    let cancelled = false;
+    setIncidentsLoaded(false);
+
+    incidentService
+      .getIncidentsByEvent(event.id)
+      .then((rows: any[]) => {
+        if (cancelled) return;
+        setIncidents(rows);
+        setIncidentsError(null);
+      })
+      .catch((error: any) => {
+        // The report says it could not read them, rather than reporting zero
+        // incidents - which would be a very different and much worse claim.
+        if (cancelled) return;
+        setIncidents([]);
+        setIncidentsError(error?.message ?? 'Incidents could not be read');
+      })
+      .finally(() => {
+        if (!cancelled) setIncidentsLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [event?.id]);
+
+  const metrics = useMemo(() => {
+    const resolved = incidents.filter((i) => i.status === 'resolved');
+    const withTimes = resolved.filter((i) => typeof i.responseTime === 'number');
+
+    return {
+      total: incidents.length,
+      resolved: resolved.length,
+      // Null rather than 0 when there is nothing to divide by: a resolution
+      // rate of 0% and "no incidents to resolve" are opposite statements.
+      resolutionRate: incidents.length > 0
+        ? Math.round((resolved.length / incidents.length) * 100)
+        : null,
+      meanResponseMinutes: withTimes.length > 0
+        ? withTimes.reduce((sum, i) => sum + i.responseTime, 0) / withTimes.length / 60
+        : null,
+    };
+  }, [incidents]);
+
   const eventData = event ? {
     name: event.name,
     date: event.date,
-    duration: '8 hours', // Would be calculated from event start/end
+    // The schema records a start date and time but no end, so a duration would
+    // have to be assumed. It was previously the string '8 hours' on every
+    // report regardless of the event.
+    duration: 'Not recorded',
     attendance: event.registeredUsers?.length || 0,
     zones: event.zones.length,
-    incidents: 0, // Would come from monitoring data
-    responseTime: 0, // Would come from monitoring data
-    safetyScore: 0 // Would come from monitoring data
+    incidents: metrics.total,
+    responseTime: metrics.meanResponseMinutes,
+    resolutionRate: metrics.resolutionRate,
   } : null;
 
-  // Incident data would come from monitoring system
-  const incidentTableData: any[] = [];
+  // One shape, rendered by both the on-screen table and the PDF, so the
+  // document an authority receives says exactly what the operator saw.
+  const incidentTableData = incidents.map((incident: any) => ({
+    time: new Date(incident.timestamp).toLocaleTimeString(),
+    type: incident.type ?? '—',
+    severity: incident.severity ?? '—',
+    location: incident.location ?? '—',
+    response: typeof incident.responseTime === 'number'
+      ? `${Math.round(incident.responseTime / 60)} min`
+      : '—',
+    status: incident.status ?? '—',
+  }));
 
   const incidentTableColumns = [
     { key: 'time', label: 'Time', width: 'w-24' },
     { key: 'type', label: 'Type', width: 'w-32' },
-    { key: 'severityDisplay', label: 'Severity', width: 'w-28', align: 'center' as const },
+    { key: 'severity', label: 'Severity', width: 'w-28', align: 'center' as const },
     { key: 'location', label: 'Location', width: 'w-36' },
     { key: 'response', label: 'Response Time', width: 'w-32', align: 'center' as const },
-    { key: 'statusDisplay', label: 'Status', width: 'w-28', align: 'center' as const }
+    { key: 'status', label: 'Status', width: 'w-28', align: 'center' as const }
   ];
 
   const reportSections = [
@@ -48,11 +119,13 @@ const PostEventReports: React.FC = () => {
       description: 'High-level overview of safety performance and key metrics',
       icon: BarChart3,
       data: {
-        safetyScore: eventData?.safetyScore || 0,
-        incidents: eventData?.incidents || 0,
-        resolved: eventData?.incidents || 0,
-        avgResponse: eventData?.responseTime ? `${eventData.responseTime} minutes` : 'N/A',
-        attendeeSatisfaction: 'N/A'
+        // Resolved is counted, not assumed equal to the total as it was before.
+        incidents: eventData?.incidents ?? 0,
+        resolved: metrics.resolved,
+        resolutionRate: metrics.resolutionRate === null ? 'no incidents' : `${metrics.resolutionRate}%`,
+        avgResponse: metrics.meanResponseMinutes === null
+          ? 'no resolved incidents'
+          : `${metrics.meanResponseMinutes.toFixed(1)} minutes`
       }
     },
     {
@@ -110,9 +183,23 @@ const PostEventReports: React.FC = () => {
     }
   ];
 
+  const canGenerate = Boolean(eventData) && incidentsLoaded && !incidentsError;
+
   const generateReport = async () => {
     if (!eventData) {
       alert('No event data available to generate report.');
+      return;
+    }
+
+    // An unread incident list arrives here as an empty one, and the report
+    // would go out stating that the event had no incidents.
+    if (incidentsError) {
+      alert(`Incidents could not be read (${incidentsError}), so a report cannot be generated. Try again once they load.`);
+      return;
+    }
+
+    if (!incidentsLoaded) {
+      alert('Incidents are still loading. Try again in a moment.');
       return;
     }
 
@@ -126,7 +213,7 @@ const PostEventReports: React.FC = () => {
         duration: eventData.duration,
         attendance: eventData.attendance,
         incidents: eventData.incidents,
-        safetyScore: eventData.safetyScore,
+        resolutionRate: eventData.resolutionRate,
         responseTime: eventData.responseTime,
         zones: (event?.zones ?? []).map(z => z.name)
       });
@@ -202,15 +289,22 @@ const PostEventReports: React.FC = () => {
                   <div className="text-xs sm:text-sm text-ai-gray-400">Attendees</div>
                 </div>
                 <div>
-                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{eventData.safetyScore || '-'}</div>
-                  <div className="text-xs sm:text-sm text-ai-gray-400">Safety Score</div>
+                  {/* A resolution rate is defined and computable. The "safety
+                      score" that stood here was a constant zero labelled as a
+                      measurement. */}
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">
+                    {eventData.resolutionRate === null ? '—' : `${eventData.resolutionRate}%`}
+                  </div>
+                  <div className="text-xs sm:text-sm text-ai-gray-400">Incidents Resolved</div>
                 </div>
                 <div>
                   <div className="text-xl sm:text-2xl font-bold text-ai-white">{eventData.incidents}</div>
                   <div className="text-xs sm:text-sm text-ai-gray-400">Incidents</div>
                 </div>
                 <div>
-                  <div className="text-xl sm:text-2xl font-bold text-ai-white">{eventData.responseTime > 0 ? `${eventData.responseTime}m` : '-'}</div>
+                  <div className="text-xl sm:text-2xl font-bold text-ai-white">
+                    {eventData.responseTime === null ? '—' : `${eventData.responseTime.toFixed(1)}m`}
+                  </div>
                   <div className="text-xs sm:text-sm text-ai-gray-400">Avg Response</div>
                 </div>
               </div>
@@ -360,7 +454,7 @@ const PostEventReports: React.FC = () => {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={generateReport}
-                    disabled={isGenerating}
+                    disabled={isGenerating || !canGenerate}
                     className="w-full px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {isGenerating ? (
@@ -375,6 +469,16 @@ const PostEventReports: React.FC = () => {
                       </>
                     )}
                   </motion.button>
+
+                  {!canGenerate && !isGenerating && (
+                    <p className="mt-3 text-xs text-ai-gray-400 text-center">
+                      {incidentsError
+                        ? 'Incidents could not be read, so a report would understate what happened at this event.'
+                        : !eventData
+                          ? 'Select an event to generate a report.'
+                          : 'Loading incident records…'}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -386,17 +490,17 @@ const PostEventReports: React.FC = () => {
                 </h3>
                 
                 <div className="space-y-3 text-sm text-ai-gray-400">
+                  {/* This panel used to certify the deployment as GDPR
+                      compliant with a 30-day deletion schedule. Neither is
+                      something the page can know: retention is whatever the
+                      operator configured, and compliance is theirs to assert. */}
                   <p>
-                    All personal data has been processed in compliance with privacy regulations.
+                    Reports are built from the incident and zone records held for this event.
                   </p>
                   <p>
-                    Sensitive information is automatically deleted 30 days post-event unless required for legal purposes.
+                    Retention, lawful basis and regulatory position are set by the operating
+                    authority for this deployment.
                   </p>
-                  <div className="p-3 bg-ai-white/10 border border-ai-white/30 rounded-lg">
-                    <div className="font-medium text-ai-white">✓ GDPR Compliant</div>
-                    <div className="font-medium text-ai-white">✓ Data Minimization</div>
-                    <div className="font-medium text-ai-white">✓ Secure Processing</div>
-                  </div>
                 </div>
               </div>
 
@@ -405,21 +509,44 @@ const PostEventReports: React.FC = () => {
                 <h3 className="text-lg font-semibold text-white mb-4">Performance Highlights</h3>
                 
                 <div className="space-y-3">
+                  {/* Every figure here was a constant: 100%, 94%, an A+ grade and
+                      a "zero tolerance met" tick, printed on every report for
+                      every event whatever had happened at it. They are now
+                      counted from the incident rows, and say so when there are
+                      none to count. */}
                   <div className="flex items-center justify-between">
-                    <span className="text-ai-gray-400 text-sm">Incident Resolution</span>
-                    <span className="text-ai-white font-medium">100%</span>
+                    <span className="text-ai-gray-400 text-sm">Incidents recorded</span>
+                    <span className="text-ai-white font-medium">
+                      {incidentsError ? '—' : metrics.total}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-ai-gray-400 text-sm">Response Efficiency</span>
-                    <span className="text-ai-white font-medium">94%</span>
+                    <span className="text-ai-gray-400 text-sm">Resolved</span>
+                    <span className="text-ai-white font-medium">
+                      {incidentsError
+                        ? '—'
+                        : metrics.resolutionRate === null
+                          ? 'none to resolve'
+                          : `${metrics.resolved} of ${metrics.total} (${metrics.resolutionRate}%)`}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-ai-gray-400 text-sm">Safety Score</span>
-                    <span className="text-ai-white font-medium">A+</span>
+                    <span className="text-ai-gray-400 text-sm">Mean response</span>
+                    <span className="text-ai-white font-medium">
+                      {metrics.meanResponseMinutes === null
+                        ? '—'
+                        : `${metrics.meanResponseMinutes.toFixed(1)} min`}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-ai-gray-400 text-sm">Zero Tolerance</span>
-                    <span className="text-ai-white font-medium">✓ Met</span>
+                    <span className="text-ai-gray-400 text-sm">Source</span>
+                    <span className="text-ai-white font-medium">
+                      {incidentsError
+                        ? 'unavailable'
+                        : incidentsLoaded
+                          ? 'incident records'
+                          : 'loading…'}
+                    </span>
                   </div>
                 </div>
               </div>
