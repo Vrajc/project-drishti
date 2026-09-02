@@ -9,12 +9,17 @@ import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
 import { createEvent } from '../services/event.service';
 
-interface Camera {
-  id: string;
+/**
+ * A zone as this form collects it.
+ *
+ * maxCapacity is here because the server needs it and will not invent one. Zone
+ * density is reported as a percentage of capacity, and every zone created from
+ * this form used to be stored with a capacity of 100 that nobody entered - so
+ * every percentage derived from it described a limit the organizer never set.
+ */
+interface ZoneDraft {
   name: string;
-  location: string;
-  ipAddress: string;
-  rtspUrl: string;
+  maxCapacity: string;
 }
 
 interface DispatchUnit {
@@ -37,21 +42,14 @@ const EventSetup: React.FC = () => {
     date: '',
     time: '',
     crowdSize: 1000,
-    zones: [] as string[],
-    cameras: [] as Camera[],
+    zones: [] as ZoneDraft[],
     dispatchUnits: [] as DispatchUnit[],
     location: '',
     description: '',
     mapFile: null as File | null
   });
-  const [newZone, setNewZone] = useState('');
-  const [newCamera, setNewCamera] = useState<Camera>({
-    id: '',
-    name: '',
-    location: '',
-    ipAddress: '',
-    rtspUrl: ''
-  });
+  const [newZone, setNewZone] = useState<ZoneDraft>({ name: '', maxCapacity: '' });
+  const [zoneError, setZoneError] = useState<string | null>(null);
   const [newDispatchUnit, setNewDispatchUnit] = useState<DispatchUnit>({
     id: '',
     name: '',
@@ -82,6 +80,12 @@ const EventSetup: React.FC = () => {
     try {
       const eventData = {
         ...formData,
+        // Capacity is collected as text and sent as a number: the API stores it
+        // as an Int and reports density against it.
+        zones: formData.zones.map((zone) => ({
+          name: zone.name,
+          maxCapacity: Number(zone.maxCapacity),
+        })),
         organizerId: user.id || '',
         organizerEmail: user.email,
         organizerName: user.name || '',
@@ -101,6 +105,9 @@ const EventSetup: React.FC = () => {
           id: response.data._id,
           ...eventData,
           zones: normaliseZones(response.data.zones),
+          // A new event borrows no cameras yet; they are assigned from the
+          // registry afterwards, and the dashboard reads them from the server.
+          cameras: response.data.cameras ?? [],
           mapFile: response.data.mapFile, // Map file URL
           registeredUsers: []
         });
@@ -117,29 +124,31 @@ const EventSetup: React.FC = () => {
   };
 
   const addZone = () => {
-    if (newZone.trim() && !formData.zones.includes(newZone.trim())) {
-      setFormData({ ...formData, zones: [...formData.zones, newZone.trim()] });
-      setNewZone('');
+    const name = newZone.name.trim();
+    const capacity = Number(newZone.maxCapacity);
+
+    if (!name) {
+      setZoneError('A zone needs a name');
+      return;
     }
-  };
-
-  const removeZone = (zone: string) => {
-    setFormData({ ...formData, zones: formData.zones.filter(z => z !== zone) });
-  };
-
-  const addCamera = () => {
-    if (newCamera.name.trim() && newCamera.location.trim()) {
-      const camera = {
-        ...newCamera,
-        id: Math.random().toString(36).substr(2, 9)
-      };
-      setFormData({ ...formData, cameras: [...formData.cameras, camera] });
-      setNewCamera({ id: '', name: '', location: '', ipAddress: '', rtspUrl: '' });
+    if (formData.zones.some((z) => z.name.toLowerCase() === name.toLowerCase())) {
+      setZoneError(`"${name}" is already on the list`);
+      return;
     }
+    // The server rejects a zone without a capacity rather than defaulting one,
+    // so the form asks for it here instead of failing on submit.
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      setZoneError('A zone needs a maximum capacity above zero: density is a percentage of it');
+      return;
+    }
+
+    setFormData({ ...formData, zones: [...formData.zones, { name, maxCapacity: String(Math.round(capacity)) }] });
+    setNewZone({ name: '', maxCapacity: '' });
+    setZoneError(null);
   };
 
-  const removeCamera = (cameraId: string) => {
-    setFormData({ ...formData, cameras: formData.cameras.filter(c => c.id !== cameraId) });
+  const removeZone = (name: string) => {
+    setFormData({ ...formData, zones: formData.zones.filter((z) => z.name !== name) });
   };
 
   const addDispatchUnit = () => {
@@ -311,13 +320,27 @@ const EventSetup: React.FC = () => {
                 <label className="block text-sm font-medium text-ai-gray-300 mb-2">
                   Event Zones
                 </label>
-                <div className="flex flex-col xs:flex-row gap-2 mb-3">
+                <p className="text-xs text-ai-gray-500 mb-3">
+                  Capacity is what crowd density is reported against: a zone counted at 40 people
+                  against a capacity of 200 reads as 20% full. Counting geometry is drawn on a
+                  camera later - this is the layout and the limit.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-2 mb-2">
                   <input
                     type="text"
-                    value={newZone}
-                    onChange={(e) => setNewZone(e.target.value)}
+                    value={newZone.name}
+                    onChange={(e) => setNewZone({ ...newZone, name: e.target.value })}
                     className="flex-1 min-w-0 px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
-                    placeholder="Add zone (e.g., Main Stage)"
+                    placeholder="Zone name (e.g., Main Stage)"
+                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addZone())}
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    value={newZone.maxCapacity}
+                    onChange={(e) => setNewZone({ ...newZone, maxCapacity: e.target.value })}
+                    className="w-full sm:w-44 shrink-0 px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
+                    placeholder="Max capacity"
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addZone())}
                   />
                   <motion.button
@@ -330,108 +353,55 @@ const EventSetup: React.FC = () => {
                     Add
                   </motion.button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {formData.zones.map(zone => (
-                    <motion.span
-                      key={zone}
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="pl-3 pr-1 py-1 bg-ai-gray-600/20 text-ai-gray-300 rounded-full text-sm flex items-center gap-1 max-w-full"
-                    >
-                      <span className="truncate">{zone}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeZone(zone)}
-                        aria-label={`Remove ${zone}`}
-                        className="shrink-0 w-6 h-6 leading-none flex items-center justify-center rounded-full text-ai-gray-400 hover:text-white hover:bg-ai-gray-700/50 transition-colors"
-                      >
-                        ×
-                      </button>
-                    </motion.span>
-                  ))}
-                </div>
-              </div>
 
-              {/* Camera Inputs */}
-              <div>
-                <label className="block text-sm font-medium text-ai-gray-300 mb-4">
-                  <Video className="w-4 h-4 inline mr-2" />
-                  Camera Inputs
-                </label>
-                <div className="space-y-3 mb-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={newCamera.name}
-                      onChange={(e) => setNewCamera({ ...newCamera, name: e.target.value })}
-                      className="px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
-                      placeholder="Camera name (e.g., Main Gate Camera)"
-                    />
-                    <input
-                      type="text"
-                      value={newCamera.location}
-                      onChange={(e) => setNewCamera({ ...newCamera, location: e.target.value })}
-                      className="px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
-                      placeholder="Location (e.g., North Entrance)"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      value={newCamera.ipAddress}
-                      onChange={(e) => setNewCamera({ ...newCamera, ipAddress: e.target.value })}
-                      className="px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
-                      placeholder="IP Address (e.g., 192.168.1.100)"
-                    />
-                    <input
-                      type="text"
-                      value={newCamera.rtspUrl}
-                      onChange={(e) => setNewCamera({ ...newCamera, rtspUrl: e.target.value })}
-                      className="px-4 py-3 bg-ai-gray-800/50 border border-ai-gray-800 rounded-xl text-white placeholder-gray-400 focus:border-ai-white focus:outline-none transition-colors"
-                      placeholder="RTSP URL (optional)"
-                    />
-                  </div>
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    type="button"
-                    onClick={addCamera}
-                    className="w-full px-6 py-3 bg-ai-white text-ai-black rounded-xl hover:bg-ai-gray-300 transition-colors"
-                  >
-                    Add Camera
-                  </motion.button>
-                </div>
+                {zoneError && (
+                  <p className="text-sm text-red-400 mb-3 break-anywhere">{zoneError}</p>
+                )}
+
                 <div className="space-y-2">
-                  {formData.cameras.map(camera => (
+                  {formData.zones.map((zone) => (
                     <motion.div
-                      key={camera.id}
-                      initial={{ opacity: 0, y: -10 }}
+                      key={zone.name}
+                      initial={{ opacity: 0, y: -4 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="p-4 bg-ai-gray-800/30 border border-ai-gray-800 rounded-xl"
+                      className="flex items-center justify-between gap-3 px-4 py-2.5 bg-ai-gray-800/40 border border-ai-gray-800 rounded-xl"
                     >
-                      <div className="flex justify-between items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Video className="w-4 h-4 text-ai-gray-400 shrink-0" />
-                            <h4 className="font-medium text-white break-anywhere">{camera.name}</h4>
-                          </div>
-                          <div className="text-xs sm:text-sm text-ai-gray-400 space-y-1 break-anywhere">
-                            <p>📍 Location: {camera.location}</p>
-                            {camera.ipAddress && <p>🌐 IP: {camera.ipAddress}</p>}
-                            {camera.rtspUrl && <p>🔗 RTSP: {camera.rtspUrl}</p>}
-                          </div>
-                        </div>
+                      <span className="text-ai-gray-200 truncate">{zone.name}</span>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm text-ai-gray-400">
+                          {Number(zone.maxCapacity).toLocaleString()} capacity
+                        </span>
                         <button
                           type="button"
-                          onClick={() => removeCamera(camera.id)}
-                          className="icon-btn shrink-0 p-1 text-ai-gray-400 hover:text-red-500 transition-colors"
+                          onClick={() => removeZone(zone.name)}
+                          aria-label={`Remove ${zone.name}`}
+                          className="icon-btn w-6 h-6 leading-none flex items-center justify-center rounded-full text-ai-gray-400 hover:text-white hover:bg-ai-gray-700/50 transition-colors"
                         >
-                          <X className="w-5 h-5" />
+                          ×
                         </button>
                       </div>
                     </motion.div>
                   ))}
                 </div>
+              </div>
+
+              {/* Cameras come from the registry, not from this form.
+                  This block used to collect a name, a location, an IP and an
+                  RTSP URL and create Camera rows from them. Nothing validated
+                  any of it, so an event could be set up with cameras the health
+                  poller could never reach and no stream could ever be served
+                  from - registry rows that only looked like an estate. A
+                  camera is assigned to an event after it is created. */}
+              <div className="rounded-xl border border-ai-gray-800 bg-ai-gray-800/30 p-4">
+                <label className="block text-sm font-medium text-ai-gray-300 mb-2">
+                  <Video className="w-4 h-4 inline mr-2" />
+                  Cameras
+                </label>
+                <p className="text-sm text-ai-gray-400">
+                  Cameras are assigned from the surveillance registry once the event exists, so
+                  every camera on an event is a real registered camera the health poller is
+                  probing. Create the event, then assign its cameras from the event dashboard.
+                </p>
               </div>
 
               {/* Emergency Dispatch Units */}

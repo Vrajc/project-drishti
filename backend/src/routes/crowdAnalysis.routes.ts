@@ -1,12 +1,10 @@
 import express from 'express';
 import {
-  processVideoFootage,
   getCrowdDensity,
   getLatestDensity,
   getZoneStatistics,
   getHeatmapData,
   getEventZones,
-  uploadVideo,
 } from '../controllers/crowdAnalysis.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
@@ -15,12 +13,8 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
-/**
- * @route   POST /api/crowd-analysis/process
- * @desc    Upload and process video footage for crowd analysis
- * @access  Private (Organizers only)
- */
-router.post('/process', uploadVideo.single('video'), processVideoFootage);
+// POST /process is gone. Crowd density is not something an event uploads after
+// the fact; it is counted live from the cameras the event has been assigned.
 
 /**
  * @route   GET /api/crowd-analysis/:eventId/density

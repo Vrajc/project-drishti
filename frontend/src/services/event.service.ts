@@ -18,14 +18,12 @@ export interface CreateEventData {
   date: string;
   time: string;
   crowdSize: number;
-  zones: string[];
-  cameras: Array<{
-    id: string;
-    name: string;
-    location: string;
-    ipAddress: string;
-    rtspUrl: string;
-  }>;
+  /**
+   * Zone name and the capacity density is measured against. The server rejects
+   * a zone without a capacity above zero rather than defaulting one, because
+   * every percentage it reports is derived from this number.
+   */
+  zones: Array<{ name: string; maxCapacity: number }>;
   dispatchUnits: Array<{
     id: string;
     name: string;

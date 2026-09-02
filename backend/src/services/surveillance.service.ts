@@ -628,9 +628,15 @@ export async function getCameraStream(id: string): Promise<StreamEndpoints | nul
  * has reported a count yet" rather than as an estate with nobody in it. Those
  * are different claims and only one of them is true.
  */
-export async function getEstateCrowd() {
+export async function getEstateCrowd(filter: { eventId?: string } = {}) {
+  // Scoped to one event, this answers the organizer's question instead: how
+  // busy are the zones on the cameras this event has been given. It is the
+  // same reading from the same table - an event does not get its own counting
+  // pipeline, it gets the cameras it borrowed from the registry.
   const zones = await prisma.zone.findMany({
-    where: { cameraId: { not: null } },
+    where: filter.eventId
+      ? { cameraId: { not: null }, camera: { eventId: filter.eventId } }
+      : { cameraId: { not: null } },
     select: {
       id: true,
       zoneId: true,
@@ -676,7 +682,9 @@ export async function getEstateCrowd() {
     if (reading.zoneId && !latest.has(reading.zoneId)) latest.set(reading.zoneId, reading);
   }
 
-  const totalReadings = await prisma.crowdDensity.count();
+  const totalReadings = await prisma.crowdDensity.count(
+    filter.eventId ? { where: { eventId: filter.eventId } } : undefined
+  );
 
   return {
     zones: zones.map((zone) => {

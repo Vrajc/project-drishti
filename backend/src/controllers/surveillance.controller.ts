@@ -202,9 +202,14 @@ export const getHealthStatus = async (_req: Request, res: Response) => {
  * is told how many zones exist versus how many have ever reported, so an empty
  * list reads as "not measured yet" rather than "nobody is there".
  */
-export const getCrowd = async (_req: Request, res: Response) => {
+export const getCrowd = async (req: Request, res: Response) => {
   try {
-    const data = await surveillance.getEstateCrowd();
+    // `?eventId=` narrows the estate view to one event's cameras. Without it
+    // the answer is estate-wide, which is what a police operator asks for.
+    const eventId = typeof req.query.eventId === 'string' && req.query.eventId
+      ? req.query.eventId
+      : undefined;
+    const data = await surveillance.getEstateCrowd({ eventId });
     res.status(200).json({ success: true, data });
   } catch (error: any) {
     fail(res, error, 'Failed to read estate crowd data');

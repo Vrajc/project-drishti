@@ -374,14 +374,23 @@ export interface EstateCrowd {
   readings: number;
 }
 
-export const getEstateCrowd = async () => {
+/**
+ * Counted occupancy per camera zone.
+ *
+ * With an eventId it narrows to the cameras that event has been assigned, which
+ * is how an organizer sees crowd flow: the same readings from the same
+ * pipeline, scoped to the cameras they were lent. Without one it is the whole
+ * estate, which is what a police operator asks for.
+ */
+export const getEstateCrowd = async (eventId?: string) => {
   try {
     const response = await axios.get<{ success: boolean; data: EstateCrowd }>(`${API_URL}/crowd`, {
       headers: authHeaders(),
+      params: eventId ? { eventId } : undefined,
     });
     return response.data.data;
   } catch (error: any) {
-    rethrow(error, 'Fetching estate crowd data');
+    rethrow(error, 'Fetching crowd data');
   }
 };
 

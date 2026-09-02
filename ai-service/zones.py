@@ -1,10 +1,12 @@
 """
 Zone occupancy.
 
-The ray-casting test and the counting rule are ported verbatim from
-`backend/src/services/crowd_analyzer.py` - same algorithm, same vertex format,
-same "centre point of the box, first matching zone wins" behaviour. Two systems
-that count the same crowd differently are worse than one that counts it badly.
+The ray-casting test and the counting rule were ported verbatim from the
+backend's `crowd_analyzer.py` - same algorithm, same vertex format, same "centre
+point of the box, first matching zone wins" behaviour. Two systems that count
+the same crowd differently are worse than one that counts it badly. That file
+has since been removed along with the upload-a-video path it served, so this is
+now the only implementation.
 
 WHAT WAS DELIBERATELY NOT PORTED
 --------------------------------

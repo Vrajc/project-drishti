@@ -8,6 +8,43 @@ const eventInclude = {
   registrations: { select: { userId: true } },
 };
 
+/** A zone the request cannot be honoured for. Surfaces as a 400, not a default. */
+class InvalidZone extends Error {}
+
+/**
+ * Zone rows from whatever the organizer's form sent.
+ *
+ * maxCapacity has no default. Density is reported as a percentage of it, so a
+ * capacity nobody entered makes every percentage derived from it fiction - and
+ * it used to default to 100 for every zone, because the setup form collected
+ * zone names and nothing else.
+ *
+ * Coordinates stay empty here and that is correct: a counting polygon is drawn
+ * on a camera's frame, not on the event map, so an event zone is the
+ * organizer's layout and capacity, not a region a detector can count inside.
+ */
+const zoneRows = (zones: any[]) =>
+  zones.map((zone: any, i: number) => {
+    const fromString = typeof zone === 'string';
+    const name = (fromString ? zone : String(zone?.name ?? '')).trim();
+    if (!name) throw new InvalidZone(`Zone ${i + 1} needs a name`);
+
+    const capacity = Number(fromString ? NaN : zone?.maxCapacity);
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      throw new InvalidZone(
+        `Zone "${name}" needs a maximum capacity above zero: density is reported as a percentage of it`
+      );
+    }
+
+    return {
+      zoneId: (fromString ? '' : zone?.zoneId || zone?.id) || `zone-${i}`,
+      name,
+      coordinates: (fromString ? [] : zone?.coordinates) || [],
+      maxCapacity: Math.round(capacity),
+      color: fromString ? undefined : zone?.color,
+    };
+  });
+
 // Helper to format event response to match frontend expectations
 function formatEvent(event: any) {
   const { registrations, ...rest } = event;
@@ -28,7 +65,6 @@ export const createEvent = async (req: Request, res: Response) => {
       time,
       crowdSize,
       zones,
-      cameras,
       dispatchUnits,
       location,
       description,
@@ -60,24 +96,13 @@ export const createEvent = async (req: Request, res: Response) => {
         organizerEmail,
         organizerName,
         image,
-        zones: {
-          create: (zones || []).map((z: any, i: number) => ({
-            zoneId: z.id || `zone-${i}`,
-            name: typeof z === 'string' ? z : z.name,
-            coordinates: typeof z === 'string' ? [] : (z.coordinates || []),
-            maxCapacity: z.maxCapacity || 100,
-            color: z.color,
-          })),
-        },
-        cameras: {
-          create: (cameras || []).map((c: any, i: number) => ({
-            cameraId: c.id || `camera-${i}`,
-            name: c.name || `Camera ${i + 1}`,
-            location: c.location || '',
-            ipAddress: c.ipAddress || '',
-            rtspUrl: c.rtspUrl || '',
-          })),
-        },
+        zones: { create: zoneRows(zones || []) },
+        // Cameras are deliberately not created here. An event borrows cameras
+        // from the registry - `PUT /api/surveillance/cameras/:id/assignment`
+        // sets Camera.eventId - and the rows this block used to write had an
+        // empty rtspUrl and ipAddress, so the health poller could never reach
+        // them and no stream could ever be served from them. Anything sent
+        // under `cameras` is ignored; the response carries the real assignment.
         dispatchUnits: {
           create: (dispatchUnits || []).map((d: any, i: number) => ({
             unitId: d.id || `unit-${i}`,
@@ -98,6 +123,9 @@ export const createEvent = async (req: Request, res: Response) => {
       data: formatEvent(event),
     });
   } catch (error: any) {
+    if (error instanceof InvalidZone) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     console.error('Create event error:', error);
     res.status(500).json({
       success: false,
@@ -199,30 +227,12 @@ export const updateEvent = async (req: Request, res: Response) => {
       where: { id },
       data: {
         ...updateData,
-        ...(zones ? {
-          zones: {
-            deleteMany: {},
-            create: zones.map((z: any, i: number) => ({
-              zoneId: z.id || `zone-${i}`,
-              name: typeof z === 'string' ? z : z.name,
-              coordinates: typeof z === 'string' ? [] : (z.coordinates || []),
-              maxCapacity: z.maxCapacity || 100,
-              color: z.color,
-            })),
-          },
-        } : {}),
-        ...(cameras ? {
-          cameras: {
-            deleteMany: {},
-            create: cameras.map((c: any, i: number) => ({
-              cameraId: c.id || `camera-${i}`,
-              name: c.name || `Camera ${i + 1}`,
-              location: c.location || '',
-              ipAddress: c.ipAddress || '',
-              rtspUrl: c.rtspUrl || '',
-            })),
-          },
-        } : {}),
+        ...(zones ? { zones: { deleteMany: {}, create: zoneRows(zones) } } : {}),
+        // `cameras` is ignored on update as well, and here it was destructive:
+        // deleteMany deleted the registry rows themselves, taking their zones,
+        // health history and stream configuration with them, because an event
+        // editing its own layout looked like ownership. Assignment is a
+        // foreign key on the camera, changed through the surveillance API.
         ...(dispatchUnits ? {
           dispatchUnits: {
             deleteMany: {},
@@ -246,6 +256,9 @@ export const updateEvent = async (req: Request, res: Response) => {
       data: formatEvent(event),
     });
   } catch (error: any) {
+    if (error instanceof InvalidZone) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     console.error('Update event error:', error);
     if (error.code === 'P2025') {
       return res.status(404).json({ success: false, message: 'Event not found' });

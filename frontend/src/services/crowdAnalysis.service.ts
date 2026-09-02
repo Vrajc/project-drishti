@@ -53,37 +53,9 @@ export interface Zone {
 }
 
 class CrowdAnalysisService {
-  /**
-   * Upload and process video footage
-   */
-  async uploadVideo(
-    videoFile: File,
-    eventId: string,
-    cameraId?: string,
-    cameraName?: string,
-    sampleInterval: number = 15
-  ): Promise<any> {
-    const formData = new FormData();
-    formData.append('video', videoFile);
-    formData.append('eventId', eventId);
-    if (cameraId) formData.append('cameraId', cameraId);
-    if (cameraName) formData.append('cameraName', cameraName);
-    formData.append('sampleInterval', sampleInterval.toString());
-
-    const token = localStorage.getItem('drishti_token');
-    const response = await axios.post(
-      `${API_URL}/crowd-analysis/process`,
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    return response.data;
-  }
+  // uploadVideo() was here. There is no upload endpoint to call any more:
+  // crowd density is counted live from the cameras an event is assigned, not
+  // extracted from footage somebody uploads afterwards.
 
   /**
    * Get crowd density data for an event
@@ -193,21 +165,6 @@ class CrowdAnalysisService {
     return response.data.data;
   }
 
-  /**
-   * Expand zones to cover full video frame
-   */
-  async expandZonesToFullFrame(eventId: string, width: number = 640, height: number = 360): Promise<any> {
-    const token = localStorage.getItem('drishti_token');
-    const response = await axios.post(
-      `${API_URL}/zones/${eventId}/expand-zones`,
-      { width, height },
-      {
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
-
-    return response.data;
-  }
 }
 
 export default new CrowdAnalysisService();
