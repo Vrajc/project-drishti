@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { getJwtSecret } from '../config/jwt.js';
 
 // This must mirror exactly what auth.controller signs into the token. It previously
 // declared `{ id, email, role }`, which the token never carried, so `req.user.id` and
@@ -26,7 +27,7 @@ export const authenticate = async (
       return;
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JwtPayload;
+    const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
 
     req.user = decoded;
     next();

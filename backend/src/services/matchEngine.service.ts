@@ -33,9 +33,18 @@ const number = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+/** Same standing-down rule as the detection consumer; see the note there. */
+const disabledReason = (): string | null => {
+  if (process.env.MATCH_ENGINE_ENABLED === 'false') return 'MATCH_ENGINE_ENABLED=false';
+  if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL) {
+    return 'no REDIS_URL set in production';
+  }
+  return null;
+};
+
 const config = {
-  get enabled() {
-    return process.env.MATCH_ENGINE_ENABLED !== 'false';
+  get disabledReason() {
+    return disabledReason();
   },
   get redisUrl() {
     return process.env.REDIS_URL || 'redis://localhost:6379';
@@ -438,8 +447,9 @@ async function consumeOnce(redis: Redis): Promise<void> {
 }
 
 export async function startMatchEngine(): Promise<void> {
-  if (!config.enabled) {
-    console.log('🎯 Match engine disabled (MATCH_ENGINE_ENABLED=false)');
+  const standDown = config.disabledReason;
+  if (standDown) {
+    console.log(`🎯 Match engine disabled (${standDown})`);
     return;
   }
   if (stats.running) return;

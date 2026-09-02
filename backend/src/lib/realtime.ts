@@ -2,6 +2,7 @@ import type { Server as HttpServer } from 'http';
 import { Server as SocketServer, type Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import type { JwtPayload } from '../middleware/auth.middleware.js';
+import { getJwtSecret } from '../config/jwt.js';
 
 // ============================================================================
 // Realtime push.
@@ -89,10 +90,7 @@ export function initRealtime(server: HttpServer, allowedOrigins: string[]): Sock
     }
 
     try {
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET || 'your-secret-key'
-      ) as JwtPayload;
+      const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
 
       (socket.data as { user?: SocketUser }).user = {
         userId: decoded.userId,

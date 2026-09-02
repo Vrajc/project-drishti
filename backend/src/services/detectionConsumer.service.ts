@@ -27,9 +27,25 @@ const number = (value: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+/**
+ * Why the consumer is not running, or null when it should be.
+ *
+ * The localhost Redis fallback is a development convenience. A deployment that
+ * has no Redis leaves REDIS_URL unset, and the consumer would then spend the
+ * life of the process reconnecting to a localhost that will never answer. It
+ * stands down instead, and says which of the two reasons applies.
+ */
+const disabledReason = (flag: string): string | null => {
+  if (process.env[flag] === 'false') return `${flag}=false`;
+  if (process.env.NODE_ENV === 'production' && !process.env.REDIS_URL) {
+    return 'no REDIS_URL set in production';
+  }
+  return null;
+};
+
 const config = {
-  get enabled() {
-    return process.env.DETECTION_CONSUMER_ENABLED !== 'false';
+  get disabledReason() {
+    return disabledReason('DETECTION_CONSUMER_ENABLED');
   },
   get redisUrl() {
     return process.env.REDIS_URL || 'redis://localhost:6379';
@@ -397,8 +413,9 @@ async function consumeOnce(redis: Redis): Promise<void> {
 }
 
 export async function startDetectionConsumer(): Promise<void> {
-  if (!config.enabled) {
-    console.log('🔎 Detection consumer disabled (DETECTION_CONSUMER_ENABLED=false)');
+  const standDown = config.disabledReason;
+  if (standDown) {
+    console.log(`🔎 Detection consumer disabled (${standDown})`);
     return;
   }
   if (stats.running) return;

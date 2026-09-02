@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../lib/prisma.js';
+import { getJwtSecret } from '../config/jwt.js';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
 
 const getPrismaErrorResponse = (error: any) => {
@@ -110,7 +111,7 @@ export const register = async (req: Request, res: Response) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, role: user.role.toLowerCase() },
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
@@ -173,7 +174,7 @@ export const login = async (req: Request, res: Response) => {
     // Generate JWT token
     const token = jwt.sign(
       { userId: user.id, role: user.role.toLowerCase() },
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 

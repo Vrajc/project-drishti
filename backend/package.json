@@ -10,6 +10,7 @@
     "prestart": "npx prisma generate",
     "dev": "npx tsx watch src/server.ts",
     "build": "tsc",
+    "build:render": "npx prisma generate && npx prisma migrate deploy && tsc",
     "start": "node dist/server.js",
     "lint": "eslint src --ext .ts",
     "prisma:generate": "npx prisma generate",

@@ -27,7 +27,8 @@ dotenv.config();
 
 const app: Express = express();
 const PORT = process.env.PORT || 5000;
-const requiresDatabase = process.env.NODE_ENV === 'production' || process.env.REQUIRE_DATABASE === 'true';
+const isProduction = process.env.NODE_ENV === 'production';
+const requiresDatabase = isProduction || process.env.REQUIRE_DATABASE === 'true';
 
 // Middleware
 // Configure CORS to allow requests from frontend
@@ -81,6 +82,14 @@ const startServer = async () => {
   try {
     if (requiresDatabase && !process.env.DATABASE_URL) {
       console.error('❌ DATABASE_URL is required in production. Set it in your deployment environment variables.');
+      process.exit(1);
+    }
+
+    // Without this the token helpers fall back to a secret that is published in
+    // this repository, and a forged admin or police token would be accepted.
+    // Refusing to boot is the only safe response.
+    if (isProduction && !process.env.JWT_SECRET?.trim()) {
+      console.error('❌ JWT_SECRET is required in production. Sessions would otherwise be signed with a public fallback key.');
       process.exit(1);
     }
 
