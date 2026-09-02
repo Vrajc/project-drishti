@@ -990,3 +990,351 @@ short-circuit the very path under test.
 
 Gate after Phase 3: unchanged at 59 for files this phase touched; `ai-service/`
 contributes none.
+
+---
+
+## 9. Police operations — the role becomes operational
+
+`POLICE` was added in Phase 1 as the second role that owns the camera estate. It could read and
+write the registry and nothing else, because **every operational table in the product was
+event-scoped**: `Incident.eventId`, `DispatchUnit.eventId`, `CrowdDensity.eventId` and
+`Zone.eventId` were all required. A registry camera therefore could not raise an incident, hold a
+crowd reading, or have a unit sent to it — there was no row shape for "something happened at
+Akshardham", because Akshardham belongs to no event.
+
+This phase widens those four tables the same way Phase 1 widened `Camera`, and builds the
+operational surface on top.
+
+### Schema (migration `20260901182427_add_police_operations`)
+
+Additive and widening only. No column dropped, no table recreated. The non-additive statements are
+all `DROP NOT NULL`, which only widens what a column accepts.
+
+| Change | Detail |
+|---|---|
+| `Incident.eventId` | nullable — an estate camera can raise an incident with no event |
+| `Incident.reporter` | nullable — a machine-raised incident has no human reporter |
+| `Incident` + 8 columns | `cameraId`, `siteId`, `latitude`, `longitude`, `severity`, `source`, `detectionConfidence`, `ruleKey` |
+| `DispatchUnit.eventId` | nullable, plus `departmentId`, `latitude`, `longitude`, `status` |
+| `Zone.eventId` | nullable, plus `cameraId` — a zone is an event's layout **or** a camera's region of interest |
+| `CrowdDensity.eventId`, `.zoneId` | nullable — estate readings need no event |
+| `DispatchAssignment` | new: the dispatch audit trail |
+| New enums | `IncidentSeverity`, `IncidentSource`, `DispatchStatus`, `DispatchUnitStatus` |
+
+**Hand-written additions to the migration**, following the `cameras_registry_cameraId_key`
+precedent — Postgres treats NULLs as distinct, so each widened composite key needed a partial
+index, and each widened scope needed a `CHECK`:
+
+| Constraint | What it prevents |
+|---|---|
+| `zones_camera_zoneId_key` | two zones on one camera claiming the same `zoneId` |
+| `dispatch_units_registry_unitId_key` | two registry units claiming the same `unitId` |
+| `zones_scope_check` | a zone belonging to both an event and a camera, or to neither |
+| `incidents_scope_check` | an incident with no jurisdiction — invisible to both consoles at once |
+| `dispatch_units_scope_check` | an orphan unit that appears in no dispatch list |
+| `dispatch_assignments_active_key` | one unit holding two live assignments to one incident |
+| `incidents_reporter_source_check` | a `MANUAL` incident naming nobody, or an `ANOMALY` incident naming somebody |
+
+All seven verified by `INSERT` probes; all seven refused. Existing data survived unchanged:
+60 cameras, 3 events, 5 zones, 16 sites, 5 departments, 12 users.
+
+### The anomaly rule engine replaces the fabricated alert generator
+
+`services/anomalyRules.service.ts`. Three rules, each firing on a row that already exists:
+
+| Rule | Status today | Evidence it fires on |
+|---|---|---|
+| `CAMERA_OFFLINE` | **live** | a status transition the health poller genuinely observed |
+| `ZONE_CAPACITY_BREACH` | dormant | occupancy over a zone's declared `maxCapacity` |
+| `CROWD_SURGE` | dormant | rate of change between two consecutive readings |
+
+The two dormant rules are **not stubbed** — they are wired and simply never fire while
+`crowd_densities` is empty. `GET /api/dispatch/stats` reports each rule's `active` flag and what it
+`requires`, so the console can say *"dormant, waiting for crowd readings"* rather than implying
+nothing is wrong. Thresholds are env-driven (`ANOMALY_*`) and read at call time, so they can be
+changed live.
+
+`CAMERA_OFFLINE` is real now, with no detector involved: a probe reached the stream last sweep and
+failed on this one. Verified end to end — `AMD-001` reset to `UNKNOWN`, probed, and the failure
+produced:
+
+```
+transition AMD-001: UNKNOWN -> OFFLINE (Connection refused by localhost:8554)
+anomaliesRaised=1
+  "Camera AMD-001 (Kalupur Main Entrance) is offline. Last probe failed: Connection refused…"
+  source=anomaly, ruleKey=CAMERA_OFFLINE, severity=high
+  reporter=null, reporterName=null      (machine-raised, so nobody is named)
+  detectionConfidence=null              (a reachability probe has no confidence to report)
+  re-probing raised 0 more              (open incidents are not duplicated)
+```
+
+A camera that answers again resolves its own incident, but **`responseTime` is left alone** — that
+column measures human response, and crediting a self-healing stream to a responder would corrupt it.
+
+Note a deliberate consequence: only *transitions* raise. An estate that is already entirely offline
+produces no new incidents on restart. The Overview's reachable/offline tiles carry that state
+instead, which is the honest division — a standing condition is not an event.
+
+### Dispatch
+
+`services/dispatch.service.ts` and `/api/dispatch`. `police` and `admin` dispatch estate-wide;
+`organizer` keeps the ability to send their own event's marshals, and the service refuses an attempt
+to commit a unit belonging to a different event. `participant` is absent throughout — reporting an
+incident stays open to them, deciding who answers it does not.
+
+Nearest-unit ranking is a haversine over two stored coordinate pairs. **No ETA is ever produced**:
+`etaSeconds` stays null until a routing service answers, and the console prints *"ETA unavailable"*.
+Distance is labelled *straight-line*. This is the same page whose predecessor picked a random
+responder with a random ETA; the fix is the honest lesser number, not a plausible greater one.
+
+The lifecycle (`dispatch → acknowledge → arrive → clear`/`cancel`) writes each timestamp at the
+moment the transition is reported. **Nothing advances on a timer.** `meanAcknowledgeSeconds` and
+`meanArrivalSeconds` are null — rendered *"Not yet measured"* — until real samples exist; zero is
+never used to mean none.
+
+`prisma/seed-units.ts`: 30 units across the 5 existing departments, based at real police stations,
+fire stations, hospitals and control rooms in Gandhinagar and Ahmedabad. `contact` is a role label,
+not an invented phone number. **3 units are seeded without coordinates** — dispatchable but not
+rankable, listed as *"Distance unknown — unit not surveyed"*.
+
+### Realtime
+
+Socket.IO on the existing HTTP server at `/realtime`, verified by the existing JWT — no second auth
+system. Rooms are assigned from the verified token, never from a client request. A frame means
+*"read again"*, not *"here is the new state"*: REST stays authoritative and every page keeps a
+slower poll as a floor, so a missed frame costs latency, never correctness.
+
+Verified: a socket with no token is refused (`Authentication required`); with a bad token
+(`Invalid or expired token`); a police socket receives `incident:new` in 1146 ms and `dispatch:new`
+on assignment; **a participant socket connects and receives nothing from the estate room**.
+
+### API added
+
+| Method | Path | Roles |
+|---|---|---|
+| GET | `/api/incidents/estate` | `admin`, `police` — filters `status`, `severity`, `source`, `cameraId`, `siteId`, `scope`, `since`, `take` |
+| GET | `/api/dispatch/units` | `admin`, `police`, `organizer` |
+| GET | `/api/dispatch/incidents/:id/units` | ranked nearest-first |
+| GET | `/api/dispatch/incidents/:id/assignments` | |
+| POST | `/api/dispatch` | send a unit |
+| PUT | `/api/dispatch/:id` | `acknowledge` \| `arrive` \| `clear` \| `cancel` |
+| PUT | `/api/dispatch/units/:id/status` | `admin`, `police` |
+| GET | `/api/dispatch/stats` | `admin`, `police` |
+| GET | `/api/surveillance/crowd` | estate occupancy per camera zone |
+
+`POST /api/incidents` now accepts `cameraId` as an alternative to `eventId`, and inherits the
+camera's surveyed position. Existing response shapes are unchanged; every new field is additive.
+
+### Frontend
+
+`pages/police/DispatchConsole.tsx` (queue, filters, unit ranking, lifecycle actions) and
+`EstateOverview.tsx` (camera health, rule coverage, anomaly feed, estate occupancy).
+`incidentPresentation.ts` holds one definition of severity and rule presentation, as
+`cameraStatus.ts` does for camera health.
+
+`components/RequireRole.tsx` is the app's **first route guard**. §2 recorded that every route in
+`App.tsx` was unguarded; that was survivable for read-only dashboards and is not survivable for a
+page that can dispatch a unit. It does not replace the server checks and does not pretend to — it
+gives a signed-out user `/login` and a wrong-role user a clear refusal, instead of a screen of 403s.
+
+### A bug this phase's own testing found and fixed
+
+Deleting an incident cascades its `DispatchAssignment` rows away but left every committed unit
+reading `DISPATCHED` with nothing to explain it — those units would have been missing from the
+available list permanently. `deleteIncident` now frees them in the same transaction, skipping any
+unit that still holds a live assignment elsewhere. Regression-tested.
+
+### Gate and build
+
+`check-no-mocks` is at **59 occurrences — unchanged from the Phase 1 baseline**. This phase
+introduced no fabricated data. (Three transient hits came from comments in new files naming the
+functions they replace; the comments were reworded rather than allowlisted, so the gate keeps its
+signal.) `npm run build` exits 0; both `tsc --noEmit` runs exit 0.
+
+**Not verified:** no visual click-through in a browser — the same limitation as Phase 1. Both new
+pages compile and their data contracts are proven end to end against the live API, but nothing here
+confirms how they look. The crowd panel has necessarily only been seen in its empty state, since
+`crowd_densities` is still at 0 rows until a detector lands.
+
+### What this does not do
+
+Crowd-flow analytics for police is **wired, not fed**. The schema, the read path
+(`GET /api/surveillance/crowd`), the rules and the UI all exist and are honest about being empty.
+Nothing produces estate crowd readings yet, because that is the detector — Phase 3. When it lands it
+writes `CrowdDensity` rows with `eventId: null` against camera zones, and the dormant rules and the
+occupancy panel begin working with no change to anything in this section.
+
+---
+
+## 11. Phase 4 — the mock gate reaches zero
+
+`npm run verify` passes. Every occurrence of fabricated data in the audit's §3
+inventory is gone, and none was replaced by another.
+
+```
+Phase 0 baseline   76
+after Phase 0.5    59
+after Phase 4      0   (9 allowlisted: particle animation, id generation, upload filename)
+```
+
+### A note on how this phase was built
+
+This phase was worked on concurrently with a second session in the same working
+tree, which built the police-operations side: `anomalyRules.service.ts`,
+`dispatch.*`, `realtime.ts` (Socket.IO), `geo.ts`, `seed-units.ts` and the
+`pages/police/` console, plus a `add_police_operations` migration. That work
+covers 4.2's backend and 4.4 outright.
+
+What is recorded below is the half done here: 4.1, 4.3, 4.5, the 4.2 frontend,
+and the two stub routers. Where the two met — `cameraHealth.service.ts`,
+`crowdAnalysis.service.ts`, `realtime.ts` — the changes are complementary and
+both are in the tree; the commit for this phase deliberately stages only the
+files this session owns, so nothing of theirs is attributed here or overwritten.
+
+### 4.1 Crowd flow, from live detections
+
+`detectionConsumer.service.ts` reads the `drishti:detections` Redis Stream the
+ai-service publishes to and turns `zoneOccupancy` into real `CrowdDensity` rows.
+
+- Detections are grouped **by frame**, because every detection from one frame
+  carries that frame's whole occupancy map; the occupancy is read once per
+  frame, not once per detection.
+- `confidence` on a row is the **mean confidence of the person detections that
+  made up that count** — a real computation over real values, null when the
+  count is zero because there is nothing to average.
+- `peopleCount` over `maxCapacity` is **not clamped**. Over capacity is the
+  reading that matters most.
+- One row per camera-zone per `DENSITY_WRITE_INTERVAL_SECONDS` (10 by default).
+  It is the latest genuine instantaneous reading, timestamped with when that
+  count was actually observed — not an average over the window relabelled as a
+  moment.
+- A zone the worker could not place boxes in publishes `{}`, and `{}` is not a
+  count of zero: no row is written at all.
+- `frameNumber` and `processingTime` are null on live rows. A live stream has no
+  frame index to give; those belong to the archived-footage path.
+
+**The consumer feeds the rule engine.** `evaluateCrowdReadings` existed in the
+other session's `anomalyRules.service.ts` but nothing called it. The consumer
+now hands it the ids of every reading as they land, using
+`createManyAndReturn` so the ids come back from the same write rather than a
+racing re-query. This is the only path by which `ZONE_CAPACITY_BREACH` and
+`CROWD_SURGE` can fire, so an anomaly of either kind is always backed by a
+detection someone could go and look at. A rule-engine failure is caught
+separately from the write: the reading is the measurement, the anomaly is a
+judgement about it, and losing the second must not lose the first.
+
+**Deleted, not disabled:** `backend/src/utils/mockCrowdData.ts`,
+`generateAndSaveMockCrowdData()` (85 lines), the `generateMockData` controller,
+and the `POST /:eventId/generate-mock` route — verified returning 404.
+
+**The upload endpoint now runs the analyzer.** It previously accepted a video,
+discarded it, and wrote randomly generated density rows, so an organizer who
+uploaded real footage was shown numbers with no relationship to it. It calls
+`processAndSaveVideo` on the file that was actually uploaded, deletes the file
+afterwards, and answers 202 describing what was *accepted* rather than what was
+found.
+
+### 4.3 and the two stub routers
+
+`monitoring.routes.ts` had four endpoints answering with a fixed string. Three
+are now real aggregations in `monitoring.controller.ts`:
+
+| Route | Answers from |
+|---|---|
+| `/events/:id/live` | latest `CrowdDensity` per zone, camera status from the health poller, incident counts, mean response time |
+| `/events/:id/crowd-flow` | density readings over a requested window |
+| `/events/:id/anomalies` | incidents with `source: ANOMALY` only |
+
+A zone with no readings returns `latestReading: null`, and `meanResponseSeconds`
+is null rather than 0 when nothing has been resolved — 0 would read as an
+instant response. Only `ANOMALY`-sourced incidents appear in the anomaly feed;
+mixing manual reports in would overstate what the system detected on its own.
+
+The fourth stub, `POST /events/:id/emergency`, was **not** reimplemented, and the
+file says why: emergency dispatch is genuinely served by `/api/dispatch`, which
+assigns real `DispatchUnit` rows to real incidents. A second endpoint answering
+the same question differently is how two subsystems drift apart.
+
+`user.routes.ts` had four more. All five routes are now real queries, `password`
+is never selected so it cannot leak through a spread, `GET /:id` is self-or-admin
+(without which any authenticated user could enumerate the table), `PUT` refuses
+email/role/password changes rather than ignoring them silently, and `DELETE`
+refuses to remove an organizer whose events would cascade with them.
+
+### 4.5 Admin dashboard
+
+`GET /api/users/stats` returns counts from a `GROUP BY`. Measured against the
+live database:
+
+```
+was shown          participants 2103, admins 16, safety score 94.5, health 98%
+actually in the DB participants 4, organizers 6, admins 1, police 2  (13 total)
+```
+
+Every role appears in the response including empty ones, so a zero is
+distinguishable from a role that does not exist.
+
+**The safety-score tile is gone, not recomputed.** There is no defensible
+formula for collapsing incidents, response times and density breaches into one
+number, and any weighting chosen would be arbitrary while looking authoritative.
+The tile now shows **cameras online** out of the registry total, which is
+measured by the health poller, with offline and not-yet-probed counts beneath
+it. The neighbouring "System Health 98%" tile — also a constant — became **mean
+response time**, over incidents genuinely marked resolved, showing a dash rather
+than 0 when there are none.
+
+The users tab previously derived its admin count by subtracting participants and
+organizers from the total, which silently absorbed police operators into
+"admins". It now shows the admin count itself, and police as their own line.
+
+Every tile reading a stat renders `—` while the query is in flight or if it
+fails, with the server's own message in a banner. None falls back to a number.
+
+### 4.2 Anomaly detection, front end
+
+`generateMockAlert()` is deleted — 70 lines that produced a random type, a random
+location, a random description from a hand-written list, a random severity and a
+confidence in a 75–100 range, fired on a 30% coin flip every 15 seconds.
+
+The page now projects real `Incident` rows with `source: ANOMALY`, loaded from
+`/api/monitoring/events/:id/anomalies` and pushed live over the other session's
+Socket.IO gateway, with a 30s poll as a fallback so a dropped socket degrades to
+slower updates rather than a page that silently stops changing. `confidence` is
+the rule's own computed value and is `null`-able. "Start Monitoring" now
+subscribes to a feed that was already running server-side rather than starting a
+simulation, and resolving an alert writes to the server first and re-reads —
+never an optimistic mark on a request that failed.
+
+**The camera tiles no longer draw a detection box.** The old one appeared on
+`Math.random() > 0.7`. It is not replaced with a real one, because bounding boxes
+live on the detection stream and are not persisted on an `Incident` — there is
+nothing real to draw. A rectangle over the tile would be decoration pretending to
+be evidence. The tile instead shows the camera's real probed status, and a border
+plus count when the rule engine has an open anomaly against that camera. The
+always-pulsing "live" dot is now status-coloured, grey for a camera nobody has
+reached.
+
+### Verified by hand
+
+Gate passes. `npm run build` exits 0, both `tsc --noEmit` exit 0.
+
+Against a running server: `/api/users/stats` returns the true 13 users by role
+and is 403 for an organizer; `/api/monitoring/events/:id/live` returns three real
+zones each with `latestReading: null` and two cameras with
+`{"UNKNOWN": 2}`, `meanResponseSeconds: null`; `/crowd-flow` returns 0 readings;
+`/anomalies` returns 0; `POST /crowd-analysis/:id/generate-mock` returns 404.
+The detection consumer with no Redis logs `Detection consumer error (Connection
+is closed.); retrying in 1s`, then 2s — visible, backing off, and writing
+nothing.
+
+Those zeroes and nulls are the point. There is no ai-service running and no
+Redis, so nothing has been measured, and every page says so rather than showing
+a plausible number.
+
+**Not verified.** No end-to-end run from a camera to a chart: that needs
+MediaMTX, the ai-service and Redis all up, none of which this machine could run
+(Docker's daemon is down). The consumer's parsing, grouping, throttle and
+rule-engine hand-off are therefore exercised only by construction and type, not
+against a live stream. The full organizer walk-through in the phase's
+done-condition — create event, define zones, assign cameras, watch a number
+change — is unrun for the same reason. There was again no browser click-through.

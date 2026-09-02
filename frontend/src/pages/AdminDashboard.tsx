@@ -8,6 +8,8 @@ import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import ParticleHero from '../components/ParticleHero';
 import { incidentService } from '../services/incident.service';
+import { getUserStats, type UserStats } from '../services/user.service';
+import { getRegistryStats, type RegistryStats } from '../services/surveillance.service';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -20,8 +22,39 @@ const AdminDashboard: React.FC = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Both are null until the query answers. Every tile that reads them shows an
+  // explicit placeholder in the meantime rather than a zero or a stand-in.
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [registryStats, setRegistryStats] = useState<RegistryStats | null>(null);
+  const [statsError, setStatsError] = useState<string | null>(null);
+
   // Get all events from context
   const allEvents = getAllEvents();
+
+  // Real counts, replacing the participant, admin and safety-score figures this
+  // page used to invent. A failure leaves the tiles reading "unavailable" and
+  // shows why - it never falls back to a plausible number.
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all([getUserStats(), getRegistryStats()])
+      .then(([users, registry]) => {
+        if (cancelled) return;
+        setUserStats(users);
+        setRegistryStats(registry);
+        setStatsError(null);
+      })
+      .catch((error: any) => {
+        if (cancelled) return;
+        setUserStats(null);
+        setRegistryStats(null);
+        setStatsError(error.message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Fetch all incidents from all events
   useEffect(() => {
@@ -77,7 +110,8 @@ const AdminDashboard: React.FC = () => {
     return 'completed';
   };
 
-  // Calculate statistics with mock data
+  // Event and incident figures derived from what is already loaded; user and
+  // camera counts come from the queries above.
   const systemStats = useMemo(() => {
     // Calculate event statuses using proper time-based logic
     const liveEvents = allEvents.filter(e => isEventLive(e.date, e.time));
@@ -97,34 +131,47 @@ const AdminDashboard: React.FC = () => {
       ? resolvedWithTime.reduce((sum, inc) => sum + inc.responseTime, 0) / resolvedWithTime.length
       : 0;
 
-    // Count unique organizers from actual events
+    // Organizers who have actually created an event here. GET /api/users/stats
+    // reports the same figure from Postgres; this one is derived from the events
+    // already loaded, and the two agree because they count the same thing.
     const uniqueOrganizerIds = new Set(allEvents.map(event => event.organizerId).filter(Boolean));
     const actualOrganizers = uniqueOrganizerIds.size;
 
-    // Use mock data for user statistics (except organizers - use actual count)
-    const mockParticipants = 2103;
-    const mockAdmins = 16;
-    const mockAvgSafetyScore = 94.5;
-    const calculatedTotalUsers = mockParticipants + actualOrganizers + mockAdmins;
+    // Cameras the health poller has actually reached, out of every camera in
+    // the registry. Null until the registry answers - never assumed healthy.
+    const camerasOnline = registryStats ? registryStats.byStatus.ONLINE : null;
+    const camerasTotal = registryStats ? registryStats.total : null;
 
     return {
       totalEvents: allEvents.length,
       activeEvents: liveEvents.length,
       upcomingEvents: upcomingEvents.length,
       completedEvents: completedEvents.length,
-      totalUsers: calculatedTotalUsers,
+      // Straight from the users table, null while the query is in flight.
+      totalUsers: userStats ? userStats.total : null,
       totalOrganizers: actualOrganizers,
-      totalParticipants: mockParticipants,
-      totalAdmins: mockAdmins,
+      totalParticipants: userStats ? userStats.byRole.participant : null,
+      totalAdmins: userStats ? userStats.byRole.admin : null,
+      totalPolice: userStats ? userStats.byRole.police : null,
       totalIncidents: allIncidents.length,
       openIncidents,
       investigatingIncidents,
       resolvedIncidents,
       avgResponseTime,
-      avgSafetyScore: mockAvgSafetyScore,
-      systemHealth: allEvents.length > 0 ? 98 : 100
+      camerasOnline,
+      camerasTotal,
+      // There is no defensible formula for a single "safety score", and the
+      // 94.5 that used to sit here was a constant. The tile now shows camera
+      // reachability, which is measured, and the response-time tile below shows
+      // the other half of what that score pretended to summarise.
+      camerasOffline: registryStats ? registryStats.byStatus.OFFLINE : null,
+      camerasUnknown: registryStats ? registryStats.byStatus.UNKNOWN : null
     };
-  }, [allEvents, allIncidents]);
+  }, [allEvents, allIncidents, userStats, registryStats]);
+
+  // Shows a real number, or says plainly that there is not one yet.
+  const orUnavailable = (value: number | null, format?: (n: number) => string) =>
+    value === null ? '—' : format ? format(value) : value.toLocaleString();
 
   const eventsWithStatus = useMemo(() => {
     return allEvents.map(event => {
@@ -219,12 +266,20 @@ const AdminDashboard: React.FC = () => {
       ['Active Events', systemStats.activeEvents.toString()],
       ['Upcoming Events', systemStats.upcomingEvents.toString()],
       ['Completed Events', systemStats.completedEvents.toString()],
-      ['Total Users', systemStats.totalUsers.toLocaleString()],
-      ['Participants', systemStats.totalParticipants.toLocaleString()],
-      ['Organizers', systemStats.totalOrganizers.toString()],
-      ['Admins', systemStats.totalAdmins.toString()],
-      ['Average Safety Score', systemStats.avgSafetyScore.toFixed(1)],
-      ['System Health', `${systemStats.systemHealth}%`]
+      ['Total Users', orUnavailable(systemStats.totalUsers)],
+      ['Participants', orUnavailable(systemStats.totalParticipants)],
+      ['Organizers (with an event)', systemStats.totalOrganizers.toString()],
+      ['Admins', orUnavailable(systemStats.totalAdmins)],
+      ['Police operators', orUnavailable(systemStats.totalPolice)],
+      // Cameras the health poller reached on its last sweep. A dash means the
+      // registry could not be read, not that nothing is online.
+      ['Cameras online', systemStats.camerasTotal === null
+        ? '-'
+        : `${systemStats.camerasOnline} of ${systemStats.camerasTotal}`],
+      ['Open incidents', systemStats.openIncidents.toString()],
+      ['Mean response time', systemStats.avgResponseTime > 0
+        ? `${(systemStats.avgResponseTime / 60).toFixed(1)} min`
+        : 'no resolved incidents yet']
     ];
     
     autoTable(doc, {
@@ -398,8 +453,8 @@ const AdminDashboard: React.FC = () => {
                   <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Total Users</span>
                   <Users className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{systemStats.totalUsers.toLocaleString()}</div>
-                <div className="text-xs sm:text-sm text-ai-gray-500">{systemStats.totalOrganizers} organizers</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{orUnavailable(systemStats.totalUsers)}</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">{systemStats.totalOrganizers} organizers with an event</div>
               </div>
             </motion.div>
 
@@ -410,11 +465,19 @@ const AdminDashboard: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Avg Safety Score</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Cameras Online</span>
                   <Shield className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{systemStats.avgSafetyScore.toFixed(1)}</div>
-                <div className="text-xs sm:text-sm text-ai-gray-500">Excellent</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">
+                  {systemStats.camerasTotal === null
+                    ? '-'
+                    : `${systemStats.camerasOnline}/${systemStats.camerasTotal}`}
+                </div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">
+                  {systemStats.camerasTotal === null
+                    ? 'registry unavailable'
+                    : `${systemStats.camerasOffline} offline, ${systemStats.camerasUnknown} not yet probed`}
+                </div>
               </div>
             </motion.div>
 
@@ -425,10 +488,16 @@ const AdminDashboard: React.FC = () => {
               <div className="absolute inset-0 bg-gradient-to-br from-ai-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <div className="relative z-10">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">System Health</span>
+                  <span className="text-xs sm:text-sm font-medium text-ai-gray-400 tracking-wide">Mean Response</span>
                   <Activity className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">{systemStats.systemHealth}%</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1">
+                  {/* Mean over incidents genuinely marked resolved. A dash rather
+                      than 0, which would read as an instant response. */}
+                  {systemStats.avgResponseTime > 0
+                    ? `${(systemStats.avgResponseTime / 60).toFixed(1)}m`
+                    : '-'}
+                </div>
                 <div className="text-xs sm:text-sm text-ai-gray-500">Optimal</div>
               </div>
             </motion.div>
@@ -525,15 +594,19 @@ const AdminDashboard: React.FC = () => {
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-ai-gray-400">Participants</span>
-                        <span className="text-ai-white font-medium">{systemStats.totalParticipants.toLocaleString()}</span>
+                        <span className="text-ai-white font-medium">{orUnavailable(systemStats.totalParticipants)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-ai-gray-400">Organizers</span>
-                        <span className="text-ai-white font-medium">{systemStats.totalOrganizers}</span>
+                        <span className="text-ai-white font-medium">{orUnavailable(userStats ? userStats.byRole.organizer : null)}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span className="text-ai-gray-400">Admins</span>
-                        <span className="text-ai-white font-medium">{systemStats.totalAdmins}</span>
+                        <span className="text-ai-white font-medium">{orUnavailable(systemStats.totalAdmins)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-ai-gray-400">Police operators</span>
+                        <span className="text-ai-white font-medium">{orUnavailable(systemStats.totalPolice)}</span>
                       </div>
                     </div>
                   </div>
@@ -669,7 +742,7 @@ const AdminDashboard: React.FC = () => {
                   <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 border border-gray-700/50">
                     <Users className="w-8 h-8 text-cyan-400 mb-3" />
                     <div className="text-2xl font-bold text-white mb-1">
-                      {systemStats.totalParticipants.toLocaleString()}
+                      {orUnavailable(systemStats.totalParticipants)}
                     </div>
                     <div className="text-sm text-gray-400 mb-4">Total Participants</div>
                     <GradientButton className="w-full text-sm py-2">
@@ -691,7 +764,9 @@ const AdminDashboard: React.FC = () => {
                   <div className="bg-gray-800/30 rounded-xl p-4 sm:p-6 border border-gray-700/50">
                     <Shield className="w-8 h-8 text-purple-400 mb-3" />
                     <div className="text-2xl font-bold text-white mb-1">
-                      {systemStats.totalUsers - systemStats.totalParticipants - systemStats.totalOrganizers}
+                      {/* The admin count itself, not a subtraction that silently
+                          absorbed police operators into the admin total. */}
+                      {orUnavailable(systemStats.totalAdmins)}
                     </div>
                     <div className="text-sm text-gray-400 mb-4">System Admins</div>
                     <GradientButton className="w-full text-sm py-2">
@@ -715,7 +790,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between">
                         <span className="text-gray-400">Total Users</span>
-                        <span className="text-green-400 font-semibold">{systemStats.totalUsers}</span>
+                        <span className="text-green-400 font-semibold">{orUnavailable(systemStats.totalUsers)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Total Events</span>
@@ -740,7 +815,7 @@ const AdminDashboard: React.FC = () => {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Active Users</span>
-                        <span className="text-blue-400 font-semibold">{systemStats.totalUsers}</span>
+                        <span className="text-blue-400 font-semibold">{orUnavailable(systemStats.totalUsers)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-400">Uptime</span>

@@ -319,91 +319,6 @@ export class CrowdAnalysisService {
   }
 
   /**
-   * Generate and save mock crowd density data
-   */
-  async generateAndSaveMockCrowdData(
-    eventId: string,
-    cameraId?: string,
-    cameraName?: string
-  ) {
-    try {
-      const event = await prisma.event.findUnique({
-        where: { id: eventId },
-        include: { zones: true },
-      });
-      if (!event) {
-        throw new Error('Event not found');
-      }
-
-      let zones: any[] = event.zones && event.zones.length > 0 ? event.zones : [
-        { zoneId: 'zone-0', name: 'main stage' },
-        { zoneId: 'zone-1', name: 'food court' },
-        { zoneId: 'zone-2', name: 'vip area' }
-      ];
-
-      zones = zones.map((zone: any, index: number) => {
-        if (typeof zone === 'string') {
-          return { id: `zone-${index}`, name: zone };
-        }
-        return {
-          id: zone.zoneId || zone.id || `zone-${index}`,
-          name: zone.name || zone,
-        };
-      });
-
-      console.log('🔍 Event zones:', JSON.stringify(zones, null, 2));
-
-      const records: any[] = [];
-      const numFrames = 24;
-
-      for (let i = 0; i < numFrames; i++) {
-        const videoSeconds = i * 5;
-        const videoTimestamp = `0:${String(Math.floor(videoSeconds / 60)).padStart(2, '0')}:${String(videoSeconds % 60).padStart(2, '0')}`;
-
-        zones.forEach((zone: any, zoneIndex: number) => {
-          const baseCount = 5 + Math.floor(Math.random() * 5);
-          const variation = Math.floor(Math.random() * 3) - 1;
-          const peopleCount = Math.max(3, baseCount + variation);
-          const maxCapacity = 10;
-          const densityPercentage = Math.min(100, (peopleCount / maxCapacity) * 100);
-
-          records.push({
-            eventId,
-            zoneId: zone.id || `zone-${zoneIndex}`,
-            zoneName: zone.name || `Zone ${zoneIndex + 1}`,
-            peopleCount,
-            densityPercentage,
-            timestamp: new Date(Date.now() - (numFrames - i - 1) * 5000),
-            videoTimestamp,
-            cameraId: cameraId || 'camera-1',
-            cameraName: cameraName || 'Main Camera',
-            frameNumber: i,
-            confidence: 0.85 + Math.random() * 0.1,
-            processingTime: 100 + Math.random() * 50,
-          });
-        });
-      }
-
-      const result = await prisma.crowdDensity.createMany({ data: records });
-
-      console.log(`✅ Generated ${result.count} mock crowd density records`);
-
-      return {
-        success: true,
-        recordCount: result.count,
-        message: `Successfully generated ${result.count} mock crowd density records`,
-      };
-    } catch (error: any) {
-      console.error('Error generating mock crowd data:', error);
-      return {
-        success: false,
-        recordCount: 0,
-        message: error.message,
-      };
-    }
-  }
-
-  /**
    * Get crowd density heatmap data
    */
   async getHeatmapData(
@@ -426,9 +341,12 @@ export class CrowdAnalysisService {
         orderBy: { timestamp: 'asc' },
       });
 
-      // Group by zoneId and hour
+      // Group by zoneId and hour. `zoneId` is nullable since the police
+      // operations migration - a reading taken outside any defined zone still
+      // has a zoneName - so the grouping key falls back to the name and the
+      // response reports zoneId as null rather than inventing one.
       const grouped = new Map<string, {
-        zoneId: string;
+        zoneId: string | null;
         hour: number;
         zoneName: string;
         densities: number[];
@@ -437,7 +355,7 @@ export class CrowdAnalysisService {
 
       for (const record of records) {
         const hour = new Date(record.timestamp).getHours();
-        const key = `${record.zoneId}-${hour}`;
+        const key = `${record.zoneId ?? `name:${record.zoneName}`}-${hour}`;
         if (!grouped.has(key)) {
           grouped.set(key, {
             zoneId: record.zoneId,

@@ -6,7 +6,6 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import { generateMockCrowdData } from '../utils/mockCrowdData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -74,31 +73,40 @@ export const processVideoFootage = async (req: Request, res: Response) => {
       });
     }
 
-    // Process video in background (you might want to use a queue for this)
+    // This endpoint used to accept the upload, discard it, and write randomly
+    // generated density rows instead - so an organizer who uploaded real
+    // footage was shown numbers that had nothing to do with it. It now runs the
+    // analyzer on the file that was actually uploaded.
     const videoPath = req.file.path;
     const interval = parseInt(sampleInterval) || 15;
 
-    // Use mock data instead of actual video processing for faster results
-    crowdAnalysisService.generateAndSaveMockCrowdData(
-      eventId,
-      cameraId,
-      cameraName
-    ).then(result => {
-      console.log('Mock crowd data generated:', result);
-      // Optionally delete the video file after processing
-      // fs.unlinkSync(videoPath);
-    }).catch(error => {
-      console.error('Mock data generation failed:', error);
-    });
+    crowdAnalysisService
+      .processAndSaveVideo(videoPath, eventId, cameraId, cameraName, interval)
+      .then((result) => {
+        console.log(
+          `Archived footage analysed for event ${eventId}: ${result.recordCount} density record(s)`
+        );
+      })
+      .catch((error) => {
+        // The failure is surfaced through the density endpoints staying empty
+        // rather than being papered over with substitute rows.
+        console.error(`Archived footage analysis failed for event ${eventId}:`, error.message);
+      })
+      .finally(() => {
+        // The uploaded file is only needed for the duration of the analysis.
+        fs.unlink(videoPath, () => undefined);
+      });
 
-    // Return immediate response
+    // Analysis runs past the lifetime of this request, so the response says
+    // what was accepted, not what was found.
     res.status(202).json({
       success: true,
-      message: 'Video uploaded successfully. Generating crowd density data...',
+      message:
+        'Video accepted. Analysis is running; density readings appear as frames are processed.',
       data: {
         filename: req.file.filename,
         eventId,
-        estimatedTime: 'Data will be ready in a few seconds'
+        sampleIntervalSeconds: interval
       }
     });
   } catch (error: any) {
@@ -272,47 +280,3 @@ export const getEventZones = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Generate mock crowd data for testing
- */
-export const generateMockData = async (req: Request, res: Response) => {
-  try {
-    const { eventId } = req.params;
-
-    const event = await prisma.event.findUnique({
-      where: { id: eventId },
-      include: { zones: true },
-    });
-    if (!event) {
-      return res.status(404).json({
-        success: false,
-        message: 'Event not found'
-      });
-    }
-
-    if (!event.zones || event.zones.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Event has no zones defined'
-      });
-    }
-
-    const records = await generateMockCrowdData(eventId, event.zones);
-
-    res.status(200).json({
-      success: true,
-      message: `Generated ${records.length} mock crowd density records`,
-      data: {
-        recordCount: records.length,
-        zones: event.zones.length
-      }
-    });
-  } catch (error: any) {
-    console.error('Error in generateMockData:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to generate mock data',
-      error: error.message
-    });
-  }
-};

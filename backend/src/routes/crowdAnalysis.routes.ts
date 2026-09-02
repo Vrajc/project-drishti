@@ -7,7 +7,6 @@ import {
   getHeatmapData,
   getEventZones,
   uploadVideo,
-  generateMockData
 } from '../controllers/crowdAnalysis.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 
@@ -61,11 +60,5 @@ router.get('/:eventId/heatmap', getHeatmapData);
  */
 router.get('/:eventId/zones', getEventZones);
 
-/**
- * @route   POST /api/crowd-analysis/:eventId/generate-mock
- * @desc    Generate mock crowd density data for testing
- * @access  Private
- */
-router.post('/:eventId/generate-mock', generateMockData);
 
 export default router;

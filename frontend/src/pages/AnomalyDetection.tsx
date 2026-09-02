@@ -5,8 +5,12 @@ import { useEvent } from '../contexts/EventContext';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
-import { analyzeIncident } from '../services/ai.service';
+import { getAnomalies, getLiveMonitoring, type Anomaly } from '../services/monitoring.service';
+import { incidentService } from '../services/incident.service';
+import { onRealtime } from '../lib/socket';
 
+// A projection of a real Incident row with source=ANOMALY. Nothing on this page
+// constructs one: every field below comes from the rule engine's own output.
 interface Alert {
   id: string;
   type: 'fire' | 'panic' | 'medical' | 'security';
@@ -15,7 +19,46 @@ interface Alert {
   timestamp: Date;
   description: string;
   status: 'active' | 'resolved' | 'investigating';
-  confidence: number;
+  /**
+   * The rule's own computed confidence. Null when the rule did not produce one -
+   * rendered as a dash, never as a number in a plausible range.
+   */
+  confidence: number | null;
+  ruleKey: string | null;
+  cameraId: string | null;
+}
+
+/**
+ * Maps a rule to the icon this page already had. A rule with no mapping falls
+ * back to 'security' rather than being dropped, so a new server-side rule still
+ * shows up here the day it is added.
+ */
+const RULE_PRESENTATION: Record<string, Alert['type']> = {
+  CAMERA_OFFLINE: 'security',
+  ZONE_CAPACITY_BREACH: 'panic',
+  CROWD_SURGE: 'panic',
+};
+
+function toAlert(anomaly: Anomaly): Alert {
+  const status =
+    anomaly.status === 'RESOLVED'
+      ? 'resolved'
+      : anomaly.status === 'INVESTIGATING'
+        ? 'investigating'
+        : 'active';
+
+  return {
+    id: anomaly.id,
+    type: RULE_PRESENTATION[anomaly.ruleKey ?? ''] ?? 'security',
+    severity: (anomaly.severity?.toLowerCase() as Alert['severity']) ?? 'medium',
+    location: anomaly.location || anomaly.camera?.name || 'Location not recorded',
+    timestamp: new Date(anomaly.timestamp),
+    description: anomaly.description,
+    status,
+    confidence: anomaly.detectionConfidence,
+    ruleKey: anomaly.ruleKey,
+    cameraId: anomaly.camera?.id ?? null,
+  };
 }
 
 const AnomalyDetection: React.FC = () => {
@@ -28,6 +71,11 @@ const AnomalyDetection: React.FC = () => {
     detectionsToday: 0,
     avgResponseTime: 0
   });
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  // Real camera health for this event, keyed by camera UUID. Empty until the
+  // query answers, so a tile shows "status unknown" rather than a green dot.
+  const [cameraHealth, setCameraHealth] = useState<Record<string, { status: string; lastSeenAt: string | null }>>({});
 
   // Get cameras from event setup
   const eventCameras = event?.cameras || [];
@@ -46,134 +94,105 @@ const AnomalyDetection: React.FC = () => {
     critical: 'border-ai-white bg-ai-white/10'
   };
 
-  const generateMockAlert = async (): Promise<Alert> => {
-    const types = ['fire', 'panic', 'medical', 'security'] as const;
-    const descriptions = {
-      fire: [
-        'Smoke detected in vicinity',
-        'High temperature anomaly detected',
-        'Fire risk: Unattended ignition source detected',
-        'Smoke pattern consistent with early-stage fire'
-      ],
-      panic: [
-        'Sudden crowd movement patterns detected',
-        'Rapid crowd dispersal behavior observed',
-        'High-density crowd stress indicators',
-        'Abnormal crowd flow direction changes'
-      ],
-      medical: [
-        'Person down detected via video analysis',
-        'Unconscious individual identified',
-        'Medical distress posture detected',
-        'Person requiring immediate assistance'
-      ],
-      security: [
-        'Suspicious activity identified',
-        'Unauthorized access attempt detected',
-        'Unattended baggage detected',
-        'Restricted area breach detected'
-      ]
-    };
+  // Loads the anomalies the rule engine has actually raised for this event, and
+  // the real camera health behind the tiles. Called when monitoring starts and
+  // whenever a live push tells us something changed.
+  const refresh = React.useCallback(async () => {
+    if (!event?.id) return;
 
-    // Use event cameras or default locations
-    const locations = eventCameras.length > 0 
-      ? eventCameras.map(cam => cam.location)
-      : ['Main Stage', 'Food Court', 'VIP Area', 'Entrance Gate', 'Parking Lot', 'Emergency Exit 3'];
-
-    const type = types[Math.floor(Math.random() * types.length)];
-    const location = locations[Math.floor(Math.random() * locations.length)];
-    const description = descriptions[type][Math.floor(Math.random() * descriptions[type].length)];
-    
-    // Use AI to analyze the incident
+    setLoading(true);
     try {
-      const analysis = await analyzeIncident({
-        type,
-        location,
-        description,
-        context: 'Live event monitoring via AI video analysis'
-      });
-
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        type,
-        severity: analysis.analysis.severity,
-        location,
-        timestamp: new Date(),
-        description,
-        status: 'active',
-        confidence: analysis.analysis.confidence
-      };
-    } catch (error) {
-      // Fallback to random if AI fails
-      const severities = ['low', 'medium', 'high', 'critical'] as const;
-      return {
-        id: Math.random().toString(36).substr(2, 9),
-        type,
-        severity: severities[Math.floor(Math.random() * severities.length)],
-        location,
-        timestamp: new Date(),
-        description,
-        status: 'active',
-        confidence: Math.floor(Math.random() * 25) + 75 // 75-100% confidence
-      };
-    }
-  };
-
-  useEffect(() => {
-    if (isMonitoring) {
-      // Update stats based on actual data
-      setStats({
-        camerasActive: isMonitoring ? eventCameras.length : 0,
-        totalCameras: eventCameras.length,
-        detectionsToday: alerts.length,
-        avgResponseTime: 0
-      });
-    }
-  }, [isMonitoring, alerts.length, eventCameras.length]);
-
-  // Simulate periodic anomaly detection from camera feeds
-  useEffect(() => {
-    if (!isMonitoring || eventCameras.length === 0) return;
-
-    const interval = setInterval(async () => {
-      // Random chance of new detection (30% chance every 15 seconds)
-      if (Math.random() < 0.3 && alerts.filter(a => a.status === 'active').length < 8) {
-        const newAlert = await generateMockAlert();
-        setAlerts(prev => [newAlert, ...prev].slice(0, 20)); // Keep only latest 20 alerts
-      }
-    }, 15000); // Check every 15 seconds
-
-    return () => clearInterval(interval);
-  }, [isMonitoring, eventCameras.length, alerts]);
-
-  const toggleMonitoring = async () => {
-    const newMonitoringState = !isMonitoring;
-    setIsMonitoring(newMonitoringState);
-    
-    if (newMonitoringState) {
-      // Generate initial mock alerts when monitoring starts
-      const initialAlerts = await Promise.all([
-        generateMockAlert(),
-        generateMockAlert()
+      const [anomalies, live] = await Promise.all([
+        getAnomalies(event.id, 50),
+        getLiveMonitoring(event.id),
       ]);
-      setAlerts(initialAlerts);
-    } else {
-      setAlerts([]);
+
+      setAlerts(anomalies.map(toAlert));
+
+      const health: Record<string, { status: string; lastSeenAt: string | null }> = {};
+      for (const camera of live.cameras) {
+        health[camera.id] = { status: camera.status, lastSeenAt: camera.lastSeenAt };
+      }
+      setCameraHealth(health);
+
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
       setStats({
-        camerasActive: 0,
-        totalCameras: 0,
-        detectionsToday: 0,
-        avgResponseTime: 0
+        // Cameras the health poller actually reached, not "all of them because
+        // monitoring is switched on".
+        camerasActive: live.cameraStatusCounts.ONLINE ?? 0,
+        totalCameras: live.cameras.length,
+        detectionsToday: anomalies.filter((a) => new Date(a.timestamp) >= startOfToday).length,
+        // Mean over genuinely resolved incidents, in minutes. 0 means there are
+        // none yet, and the tile renders that as a dash.
+        avgResponseTime: live.incidents.meanResponseSeconds === null
+          ? 0
+          : Math.round((live.incidents.meanResponseSeconds / 60) * 10) / 10,
       });
+      setLoadError(null);
+    } catch (error: any) {
+      // The list stays as it was and the banner says why. It never falls back
+      // to generated alerts.
+      setLoadError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [event?.id]);
+
+  // Anomalies are raised server-side by the rule engine whether this page is
+  // open or not. "Monitoring" here means subscribing to that feed, not starting
+  // the detection - so nothing is invented while it is switched off.
+  useEffect(() => {
+    if (!isMonitoring || !event?.id) return;
+
+    void refresh();
+
+    const offNew = onRealtime('incident:new', (payload: any) => {
+      if (payload?.source !== 'anomaly') return;
+      if (payload?.eventId && payload.eventId !== event.id) return;
+      void refresh();
+    });
+    const offUpdated = onRealtime('incident:updated', () => {
+      void refresh();
+    });
+
+    // A fallback poll, so a dropped socket degrades to slower updates rather
+    // than a page that silently stops changing.
+    const interval = setInterval(() => void refresh(), 30000);
+
+    return () => {
+      offNew();
+      offUpdated();
+      clearInterval(interval);
+    };
+  }, [isMonitoring, event?.id, refresh]);
+
+  const toggleMonitoring = () => {
+    const next = !isMonitoring;
+    setIsMonitoring(next);
+
+    if (!next) {
+      // Stopping only detaches this page from the feed. The rule engine keeps
+      // running server-side, so the counters are cleared rather than frozen at
+      // their last values, which would go stale without saying so.
+      setAlerts([]);
+      setCameraHealth({});
+      setLoadError(null);
+      setStats({ camerasActive: 0, totalCameras: 0, detectionsToday: 0, avgResponseTime: 0 });
     }
   };
 
-  const resolveAlert = (alertId: string) => {
-    setAlerts(prev => prev.map(alert => 
-      alert.id === alertId 
-        ? { ...alert, status: 'resolved' as const }
-        : alert
-    ));
+  // Resolution is a real state change on a real incident, so it goes to the
+  // server first. The list is refreshed from what the server actually stored,
+  // never optimistically marked resolved on a request that failed.
+  const resolveAlert = async (alertId: string) => {
+    try {
+      await incidentService.updateIncidentStatus(alertId, 'resolved');
+      await refresh();
+    } catch (error: any) {
+      setLoadError(`Could not resolve this anomaly: ${error.message}`);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -261,6 +280,17 @@ const AnomalyDetection: React.FC = () => {
                 </motion.button>
               </div>
             </div>
+
+            {isMonitoring && loadError && (
+              <div className="mb-4 p-3 rounded-lg bg-red-500/15 border border-red-500/40 text-sm text-red-200">
+                <p className="font-medium mb-0.5">The anomaly feed could not be read.</p>
+                <p className="text-xs break-anywhere">{loadError}</p>
+              </div>
+            )}
+
+            {isMonitoring && !loadError && loading && alerts.length === 0 && (
+              <p className="mb-4 text-sm text-ai-gray-500">Loading anomalies raised for this event...</p>
+            )}
 
             {isMonitoring && (
               <motion.div
@@ -415,19 +445,44 @@ const AnomalyDetection: React.FC = () => {
                           📍 {camera.location}
                         </div>
                       </div>
-                      <div className="absolute top-2 right-2">
-                        <div className="w-2 h-2 bg-ai-white rounded-full animate-pulse" />
+                      {/* The camera's real state, from the health poller's last
+                          probe. A camera nobody has reached shows grey, not a
+                          pulsing green dot. */}
+                      <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                        <span
+                          className={`w-2 h-2 rounded-full ${
+                            cameraHealth[camera.id]?.status === 'ONLINE'
+                              ? 'bg-emerald-400 animate-pulse'
+                              : cameraHealth[camera.id]?.status === 'DEGRADED'
+                                ? 'bg-amber-400'
+                                : cameraHealth[camera.id]?.status === 'OFFLINE'
+                                  ? 'bg-red-400'
+                                  : 'bg-ai-gray-500'
+                          }`}
+                        />
+                        <span className="bg-black/50 rounded px-1.5 py-0.5 text-[10px] text-ai-gray-300">
+                          {cameraHealth[camera.id]?.status
+                            ? cameraHealth[camera.id].status === 'UNKNOWN'
+                              ? 'not probed'
+                              : cameraHealth[camera.id].status.toLowerCase()
+                            : 'status unknown'}
+                        </span>
                       </div>
-                      
-                      {/* Simulate AI detection boxes */}
-                      {Math.random() > 0.7 && (
+
+                      {/* An open anomaly the rule engine actually raised against
+                          this camera. There is no detection box drawn: bounding
+                          boxes live on the detection stream and are not stored on
+                          an Incident, so there is nothing real to draw one from.
+                          A rectangle over the tile would be decoration pretending
+                          to be evidence. */}
+                      {activeAlerts.some((alert) => alert.cameraId === camera.id) && (
                         <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
-                          className="absolute inset-4 border-2 border-ai-white rounded"
+                          className="absolute inset-0 border-2 border-red-400/80 rounded pointer-events-none"
                         >
-                          <div className="bg-ai-white/80 text-ai-black text-xs px-1 py-0.5 rounded">
-                            Anomaly Detected
+                          <div className="absolute bottom-2 right-2 bg-red-500/90 text-white text-[10px] px-1.5 py-0.5 rounded">
+                            {activeAlerts.filter((a) => a.cameraId === camera.id).length} open anomaly
                           </div>
                         </motion.div>
                       )}

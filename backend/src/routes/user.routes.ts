@@ -1,23 +1,25 @@
 import { Router } from 'express';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
+import {
+  getUserStats,
+  getUsers,
+  getUserById,
+  updateUser,
+  deleteUser,
+} from '../controllers/user.controller.js';
 
 const router = Router();
 
-// User routes
-router.get('/', authenticate, authorize('admin'), (req, res) => {
-  res.json({ message: 'Get all users - to be implemented' });
-});
+// Ahead of '/:id', or "stats" is read as a user id.
+router.get('/stats', authenticate, authorize('admin'), getUserStats);
 
-router.get('/:id', authenticate, (req, res) => {
-  res.json({ message: 'Get user by ID - to be implemented' });
-});
+router.get('/', authenticate, authorize('admin'), getUsers);
 
-router.put('/:id', authenticate, (req, res) => {
-  res.json({ message: 'Update user - to be implemented' });
-});
+// Self or admin; the controller enforces which, because the middleware cannot
+// see whose record is being asked for.
+router.get('/:id', authenticate, getUserById);
+router.put('/:id', authenticate, updateUser);
 
-router.delete('/:id', authenticate, authorize('admin'), (req, res) => {
-  res.json({ message: 'Delete user - to be implemented' });
-});
+router.delete('/:id', authenticate, authorize('admin'), deleteUser);
 
 export default router;
