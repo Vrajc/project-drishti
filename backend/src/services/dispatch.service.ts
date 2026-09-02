@@ -416,3 +416,144 @@ export async function getDispatchStats() {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Managing registry units
+//
+// Units could be listed, and their status changed, but never created: the only
+// dispatch units that existed on the estate were the ones `npm run seed:units`
+// wrote. An operator opening the dispatch console on a fresh deployment had
+// nothing to send and no way to add anything, so the console's whole purpose
+// was unreachable without shell access to the server.
+//
+// Event units are created with their event and stay that way. These are the
+// estate's own, hanging off a department - which is what dispatch_units_scope_
+// check requires of a unit that has no event.
+// ---------------------------------------------------------------------------
+
+const UNIT_STATUSES: DispatchUnitStatus[] = ['AVAILABLE', 'DISPATCHED', 'BUSY', 'OFFLINE'];
+
+function parseUnitInput(input: any, { partial }: { partial: boolean }) {
+  const data: any = {};
+
+  const setString = (key: string, label: string, required: boolean) => {
+    if (input?.[key] === undefined) {
+      if (required && !partial) throw new ValidationError(`A unit needs ${label}`);
+      return;
+    }
+    const value = String(input[key]).trim();
+    if (!value && required) throw new ValidationError(`A unit needs ${label}`);
+    data[key] = value;
+  };
+
+  setString('unitId', 'an identifier', true);
+  setString('name', 'a name', true);
+  setString('type', 'a type', true);
+  setString('contact', 'a contact', true);
+  setString('location', 'a base location', true);
+
+  if (input?.capacity !== undefined || !partial) {
+    const capacity = Number(input?.capacity);
+    if (!Number.isFinite(capacity) || capacity <= 0) {
+      throw new ValidationError('A unit needs a capacity above zero');
+    }
+    data.capacity = Math.round(capacity);
+  }
+
+  // Both or neither: half a coordinate is not a position, and the nearest-unit
+  // ranking skips unlocated units rather than guessing where they are.
+  const hasLat = input?.latitude !== undefined && input?.latitude !== null && input?.latitude !== '';
+  const hasLon =
+    input?.longitude !== undefined && input?.longitude !== null && input?.longitude !== '';
+  if (hasLat || hasLon) {
+    if (hasLat !== hasLon) {
+      throw new ValidationError('A unit position needs both latitude and longitude, or neither');
+    }
+    const latitude = Number(input.latitude);
+    const longitude = Number(input.longitude);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+      throw new ValidationError('latitude must be between -90 and 90');
+    }
+    if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      throw new ValidationError('longitude must be between -180 and 180');
+    }
+    data.latitude = latitude;
+    data.longitude = longitude;
+  } else if (input?.latitude === null) {
+    data.latitude = null;
+    data.longitude = null;
+  }
+
+  if (input?.status !== undefined) {
+    const status = String(input.status).toUpperCase() as DispatchUnitStatus;
+    if (!UNIT_STATUSES.includes(status)) {
+      throw new ValidationError(`status must be one of ${UNIT_STATUSES.join(', ').toLowerCase()}`);
+    }
+    data.status = status;
+  }
+
+  return data;
+}
+
+export async function createUnit(input: any) {
+  const data = parseUnitInput(input, { partial: false });
+
+  const departmentId = input?.departmentId ? String(input.departmentId) : null;
+  if (!departmentId) {
+    throw new ValidationError(
+      'An estate unit belongs to a department: a unit with neither a department nor an event could never appear in a dispatch list'
+    );
+  }
+
+  const department = await prisma.department.findUnique({ where: { id: departmentId } });
+  if (!department) throw new ValidationError('That department does not exist');
+
+  const clash = await prisma.dispatchUnit.findFirst({
+    where: { eventId: null, unitId: data.unitId },
+    select: { id: true },
+  });
+  if (clash) throw new ValidationError(`An estate unit with id ${data.unitId} already exists`);
+
+  const unit = await prisma.dispatchUnit.create({
+    data: { ...data, departmentId, eventId: null },
+    include: unitInclude,
+  });
+
+  return formatUnit(unit);
+}
+
+export async function updateUnit(id: string, input: any) {
+  const existing = await prisma.dispatchUnit.findUnique({ where: { id }, select: { id: true } });
+  if (!existing) return null;
+
+  const data = parseUnitInput(input, { partial: true });
+
+  if (input?.departmentId !== undefined) {
+    const departmentId = input.departmentId ? String(input.departmentId) : null;
+    if (departmentId) {
+      const department = await prisma.department.findUnique({ where: { id: departmentId } });
+      if (!department) throw new ValidationError('That department does not exist');
+    }
+    data.departmentId = departmentId;
+  }
+
+  const unit = await prisma.dispatchUnit.update({ where: { id }, data, include: unitInclude });
+  return formatUnit(unit);
+}
+
+/**
+ * Removing a unit takes its assignment history with it - DispatchAssignment
+ * cascades on the unit. The caller is told how many, because those rows are the
+ * record of where that unit was sent.
+ */
+export async function deleteUnit(id: string) {
+  const existing = await prisma.dispatchUnit.findUnique({
+    where: { id },
+    select: { id: true, name: true },
+  });
+  if (!existing) return null;
+
+  const assignments = await prisma.dispatchAssignment.count({ where: { unitId: id } });
+  await prisma.dispatchUnit.delete({ where: { id } });
+  return { id, name: existing.name, assignmentsDeleted: assignments };
+}

@@ -501,3 +501,45 @@ export const deleteCameraZone = async (zoneId: string) => {
     rethrow(error, 'Deleting the counting zone');
   }
 };
+
+/**
+ * Departments and sites were read-only until now: the dropdowns that filter the
+ * registry were fed by rows a seed script wrote. A department is also what an
+ * estate dispatch unit belongs to, so creating one is the first step in setting
+ * up the responder side of the estate.
+ */
+export const createDepartment = async (payload: {
+  code: string;
+  name: string;
+  contactName?: string;
+  contactPhone?: string;
+}) => {
+  try {
+    const response = await axios.post<{ success: boolean; data: Department }>(
+      `${API_URL}/departments`,
+      payload,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Creating the department');
+  }
+};
+
+export const createSite = async (payload: {
+  code: string;
+  name: string;
+  departmentId?: string | null;
+  address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+}) => {
+  try {
+    const response = await axios.post<{ success: boolean; data: Site }>(`${API_URL}/sites`, payload, {
+      headers: authHeaders(),
+    });
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Creating the site');
+  }
+};

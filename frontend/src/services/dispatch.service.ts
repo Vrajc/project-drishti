@@ -189,6 +189,45 @@ export const dispatchService = {
     return response.data.data;
   },
 
+  /**
+   * Adds a unit to the estate's own responders.
+   *
+   * Estate units belong to a department - a unit with neither a department nor
+   * an event appears in no dispatch list and can never be sent anywhere, which
+   * the database refuses outright. Event units are created with their event.
+   */
+  async createUnit(payload: {
+    unitId: string;
+    name: string;
+    type: string;
+    contact: string;
+    capacity: number;
+    location: string;
+    departmentId: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  }): Promise<DispatchUnit> {
+    const response = await axios.post(`${DISPATCH_URL}/units`, payload, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  async updateUnit(id: string, payload: Record<string, unknown>): Promise<DispatchUnit> {
+    const response = await axios.put(`${DISPATCH_URL}/units/${id}`, payload, {
+      headers: getAuthHeaders(),
+    });
+    return response.data.data;
+  },
+
+  /** Removing a unit removes its assignment history; the reply says how much. */
+  async deleteUnit(id: string): Promise<{ message: string; assignmentsDeleted: number }> {
+    const response = await axios.delete(`${DISPATCH_URL}/units/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    return { message: response.data.message, assignmentsDeleted: response.data.data.assignmentsDeleted };
+  },
+
   /** Units that can serve one incident, nearest surveyed unit first. */
   async getUnitsForIncident(
     incidentId: string

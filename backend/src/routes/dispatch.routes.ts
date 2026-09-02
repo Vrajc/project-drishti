@@ -6,6 +6,9 @@ import {
   createDispatch,
   updateDispatch,
   updateUnitStatus,
+  createUnit,
+  updateUnit,
+  deleteUnit,
   getStats,
 } from '../controllers/dispatch.controller.js';
 import { authenticate, authorize } from '../middleware/auth.middleware.js';
@@ -29,6 +32,14 @@ const estateOnly = authorize('admin', 'police');
 
 router.get('/units', authenticate, canDispatch, getUnits);
 router.put('/units/:id/status', authenticate, estateOnly, updateUnitStatus);
+
+// The estate's own units. Event units are created with their event; these hang
+// off a department, and until now the only way one existed was a seed script.
+// estateOnly: an organizer manages their event's units through the event, not
+// the responders a department owns.
+router.post('/units', authenticate, estateOnly, createUnit);
+router.put('/units/:id', authenticate, estateOnly, updateUnit);
+router.delete('/units/:id', authenticate, estateOnly, deleteUnit);
 
 router.get('/incidents/:incidentId/units', authenticate, canDispatch, getUnitsForIncident);
 router.get('/incidents/:incidentId/assignments', authenticate, canDispatch, getAssignments);

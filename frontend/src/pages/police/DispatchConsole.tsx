@@ -7,6 +7,7 @@ import {
 import MeshGradient from '../../components/MeshGradient';
 import Spotlight from '../../components/Spotlight';
 import Navbar from '../../components/Navbar';
+import UnitsModal from './UnitsModal';
 import {
   dispatchService, formatDistance, formatDuration,
   type EstateIncident, type RankedUnit, type DispatchAssignment, type DispatchStats,
@@ -60,6 +61,9 @@ const DispatchConsole: React.FC = () => {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [realtime, setRealtime] = useState<RealtimeStatus>('connecting');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  // Managing the estate's own units. Without this the console can only dispatch
+  // whatever a seed script happened to write.
+  const [managingUnits, setManagingUnits] = useState(false);
 
   // Read inside socket handlers without making them a dependency of the effect.
   const selectedIdRef = useRef<string | null>(null);
@@ -234,6 +238,12 @@ const DispatchConsole: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => setManagingUnits(true)}
+                className="px-3 py-2 text-xs rounded-lg border border-ai-gray-700 text-ai-gray-300 hover:text-white hover:border-ai-gray-500 transition-colors"
+              >
+                Manage units
+              </button>
               {/* Says plainly whether pushes are arriving. An operator must know
                   whether they are looking at a live feed or a 15-second poll. */}
               <div className="flex items-center gap-2 text-xs text-ai-gray-400">
@@ -436,6 +446,15 @@ const DispatchConsole: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {managingUnits && (
+        <UnitsModal
+          onClose={() => setManagingUnits(false)}
+          onChanged={() => {
+            if (selectedId) loadPanel(selectedId);
+          }}
+        />
+      )}
     </div>
   );
 };

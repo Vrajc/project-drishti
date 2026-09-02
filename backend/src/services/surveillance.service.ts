@@ -991,3 +991,92 @@ export async function deleteCameraZone(zoneId: string) {
   await prisma.zone.delete({ where: { id: zoneId } });
   return { id: zoneId, name: existing.name, readingsDeleted: readings };
 }
+
+// ---------------------------------------------------------------------------
+// Creating departments and sites
+//
+// Both were read-only: listDepartments and listSites served filter dropdowns
+// and camera forms, and the only way a row got there was `npm run seed:cameras`.
+// A department is also what a registry dispatch unit hangs off - the scope
+// check requires an event or a department - so with no way to create one, the
+// estate side of dispatch could not be set up through the product at all.
+// ---------------------------------------------------------------------------
+
+/** Codes are the human handle and are unique; they are compared case-folded. */
+function parseCode(raw: unknown, label: string): string {
+  const code = String(raw ?? '').trim().toUpperCase();
+  if (!code) throw new ValidationError(`${label} needs a code`);
+  if (!/^[A-Z0-9][A-Z0-9-]*$/.test(code)) {
+    throw new ValidationError(`${label} code may use letters, digits and hyphens only`);
+  }
+  return code;
+}
+
+function parseName(raw: unknown, label: string): string {
+  const name = String(raw ?? '').trim();
+  if (!name) throw new ValidationError(`${label} needs a name`);
+  return name;
+}
+
+/** Optional WGS84 pair. Half a coordinate is not a position, so both or neither. */
+function parsePosition(latRaw: unknown, lonRaw: unknown) {
+  const hasLat = latRaw !== undefined && latRaw !== null && latRaw !== '';
+  const hasLon = lonRaw !== undefined && lonRaw !== null && lonRaw !== '';
+  if (!hasLat && !hasLon) return { latitude: null, longitude: null };
+  if (hasLat !== hasLon) {
+    throw new ValidationError('A position needs both latitude and longitude, or neither');
+  }
+
+  const latitude = Number(latRaw);
+  const longitude = Number(lonRaw);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+    throw new ValidationError('latitude must be between -90 and 90');
+  }
+  if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    throw new ValidationError('longitude must be between -180 and 180');
+  }
+  return { latitude, longitude };
+}
+
+export async function createDepartment(input: any) {
+  const code = parseCode(input?.code, 'A department');
+  const name = parseName(input?.name, 'A department');
+
+  const clash = await prisma.department.findUnique({ where: { code } });
+  if (clash) throw new ValidationError(`A department with code ${code} already exists`);
+
+  return prisma.department.create({
+    data: {
+      code,
+      name,
+      contactName: input?.contactName ? String(input.contactName).trim() : null,
+      contactPhone: input?.contactPhone ? String(input.contactPhone).trim() : null,
+    },
+  });
+}
+
+export async function createSite(input: any) {
+  const code = parseCode(input?.code, 'A site');
+  const name = parseName(input?.name, 'A site');
+  const { latitude, longitude } = parsePosition(input?.latitude, input?.longitude);
+
+  const clash = await prisma.site.findUnique({ where: { code } });
+  if (clash) throw new ValidationError(`A site with code ${code} already exists`);
+
+  const departmentId = input?.departmentId ? String(input.departmentId) : null;
+  if (departmentId) {
+    const department = await prisma.department.findUnique({ where: { id: departmentId } });
+    if (!department) throw new ValidationError('That department does not exist');
+  }
+
+  return prisma.site.create({
+    data: {
+      code,
+      name,
+      departmentId,
+      address: input?.address ? String(input.address).trim() : null,
+      latitude,
+      longitude,
+    },
+  });
+}

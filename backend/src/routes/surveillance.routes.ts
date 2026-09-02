@@ -10,6 +10,8 @@ import {
   getSites,
   getStats,
   getCameraStreamEndpoints,
+  createDepartment,
+  createSite,
   getCameraZones,
   createCameraZone,
   updateCameraZone,
@@ -58,7 +60,9 @@ router.get('/health', authenticate, canRead, getHealthStatus);
 router.put('/cameras/:id/assignment', authenticate, canRead, setCameraAssignment);
 
 router.get('/departments', authenticate, canRead, getDepartments);
+router.post('/departments', authenticate, canWrite, createDepartment);
 router.get('/sites', authenticate, canRead, getSites);
+router.post('/sites', authenticate, canWrite, createSite);
 router.get('/stats', authenticate, canRead, getStats);
 
 // Estate-wide occupancy, the counterpart to the event-scoped crowd-analysis API.

@@ -308,3 +308,21 @@ export const deleteCameraZone = async (req: Request, res: Response) => {
     fail(res, error, 'Failed to delete the counting zone');
   }
 };
+
+export const createDepartment = async (req: Request, res: Response) => {
+  try {
+    const department = await surveillance.createDepartment(req.body ?? {});
+    res.status(201).json({ success: true, message: 'Department created', data: department });
+  } catch (error: any) {
+    fail(res, error, 'Failed to create the department');
+  }
+};
+
+export const createSite = async (req: Request, res: Response) => {
+  try {
+    const site = await surveillance.createSite(req.body ?? {});
+    res.status(201).json({ success: true, message: 'Site created', data: site });
+  } catch (error: any) {
+    fail(res, error, 'Failed to create the site');
+  }
+};

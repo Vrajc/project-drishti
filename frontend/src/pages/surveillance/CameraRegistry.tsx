@@ -15,6 +15,7 @@ import type {
 } from '../../services/surveillance.service';
 import { STATUS_PRESENTATION, STATUS_ORDER, formatLastSeen, formatCoordinates } from './cameraStatus';
 import CameraZonesModal from './CameraZonesModal';
+import EstateStructureModal from './EstateStructureModal';
 
 const PAGE_SIZE = 25;
 
@@ -147,6 +148,9 @@ const CameraRegistry: React.FC = () => {
   // The camera whose counting zones are open. Nothing can be counted through a
   // camera until at least one exists, so this is reachable from every row.
   const [zoningCamera, setZoningCamera] = useState<RegistryCamera | null>(null);
+  // Departments and sites were read-only, so a deployment that never ran the
+  // seed script had nothing to file a camera under.
+  const [structureOpen, setStructureOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const loadCameras = useCallback(async () => {
@@ -294,6 +298,15 @@ const CameraRegistry: React.FC = () => {
                 <Video className="w-4 h-4" />
                 Live wall
               </button>
+              {canWrite && (
+                <button
+                  onClick={() => setStructureOpen(true)}
+                  className="px-4 py-2.5 rounded-xl border border-ai-gray-700 text-ai-gray-200 hover:text-white hover:border-ai-gray-500 transition-colors flex items-center gap-2 text-sm font-medium"
+                >
+                  <Plus className="w-4 h-4" />
+                  Departments &amp; sites
+                </button>
+              )}
               {canWrite && (
                 <button
                   onClick={openCreate}
@@ -808,6 +821,15 @@ const CameraRegistry: React.FC = () => {
             </div>
           </motion.form>
         </div>
+      )}
+
+      {structureOpen && (
+        <EstateStructureModal
+          departments={departments}
+          sites={sites}
+          onClose={() => setStructureOpen(false)}
+          onChanged={loadReference}
+        />
       )}
 
       {zoningCamera && (

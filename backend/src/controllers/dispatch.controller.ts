@@ -186,3 +186,43 @@ export const updateUnitStatus = async (req: AuthRequest, res: Response) => {
     fail(res, error, 'Failed to update unit status');
   }
 };
+
+// ---------------------------------------------------------------------------
+// Managing the estate's own units
+// ---------------------------------------------------------------------------
+
+export const createUnit = async (req: AuthRequest, res: Response) => {
+  try {
+    const unit = await dispatch.createUnit(req.body ?? {});
+    res.status(201).json({ success: true, message: 'Unit added to the estate', data: unit });
+  } catch (error: any) {
+    fail(res, error, 'Failed to create the dispatch unit');
+  }
+};
+
+export const updateUnit = async (req: AuthRequest, res: Response) => {
+  try {
+    const unit = await dispatch.updateUnit(req.params.id, req.body ?? {});
+    if (!unit) return res.status(404).json({ success: false, message: 'Unit not found' });
+    res.status(200).json({ success: true, message: 'Unit updated', data: unit });
+  } catch (error: any) {
+    fail(res, error, 'Failed to update the dispatch unit');
+  }
+};
+
+export const deleteUnit = async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await dispatch.deleteUnit(req.params.id);
+    if (!result) return res.status(404).json({ success: false, message: 'Unit not found' });
+    res.status(200).json({
+      success: true,
+      message:
+        result.assignmentsDeleted > 0
+          ? `Unit removed along with ${result.assignmentsDeleted} assignment record(s)`
+          : 'Unit removed',
+      data: result,
+    });
+  } catch (error: any) {
+    fail(res, error, 'Failed to remove the dispatch unit');
+  }
+};
