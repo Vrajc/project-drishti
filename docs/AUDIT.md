@@ -1472,3 +1472,131 @@ entered the system. What was proven is that given a detection carrying
 with the correct snapshot, in-process, against the real database.
 
 Gate still passes. `npm run build` exits 0; both `tsc --noEmit` exit 0.
+
+---
+
+## 13. Phase 6 — cross-camera vehicle tracking
+
+The graded test case. A trail is the sequence of cameras that saw a vehicle, in
+time order, with the links between them classified and never blurred.
+
+### A trail is not a GPS track, and says so
+
+Every position on the map is the **camera's** surveyed coordinate, because
+nothing in this system can place a vehicle within a field of view. That sentence
+travels with the data: it is on the `TrackPoint` model, returned by the API as
+`trailNote`, printed on the page, and carried into the exported PDF. A reader who
+only ever sees the PDF still learns what the route is and is not.
+
+Cameras in a trail that were never surveyed are **named** in `unmappableCameras`
+rather than silently dropped, so a route missing a leg says so instead of looking
+complete.
+
+### Two link types, and no third
+
+| | When | Score |
+|---|---|---|
+| `CERTAIN` | the same normalised plate was read at both ends | **null** — nothing was inferred, so there is nothing to score |
+| `PROBABLE` | no plate at one end; linked on colour, type and whether the journey is physically possible | computed, and capped |
+
+A link is **rejected outright** when the plates differ, when colour or type
+disagree (both are measured from the frame, so a mismatch is evidence *against*),
+when either camera is unsurveyed, or when the implied speed is impossible.
+
+**Straight-line distance is used deliberately, and only in the direction it is
+valid.** It is a lower bound on road distance, so the implied speed is a lower
+bound on the real one: if even that exceeds 150 km/h, no vehicle could have made
+the journey and the link is impossible. It can rule a link out; it never rules
+one in on its own. The reasoning string says this on every inferred link.
+
+**An inferred link is capped at 0.85.** The first implementation let a perfect
+agreement score 1.0, and *"PROBABLE — 100%"* reads as certainty, which is the one
+thing an inferred link must never do. Colour, type and plausible timing narrow a
+link down; they cannot identify a vehicle, because another white car of the same
+type could have made the same journey. Only a plate identifies, and that path
+returns no score at all.
+
+Every inferred link returns its components — `colorMatch`, `typeMatch`,
+`straightLineMetres`, `secondsApart`, `impliedKmh` — alongside the number, and
+the page and the PDF both print the reasoning. The single score is a ranking aid,
+and nobody has to take it on trust.
+
+### A flaw found by testing, not by reading
+
+The first version made the `PROBABLE` path **unreachable**. `getTrailByPlate`
+filters on `plateNormalised`, so a query could only ever return rows that carry
+the plate — a leg where the plate went unread was invisible, and the route
+silently jumped over it. The classifier was correct and could never run.
+
+`threadProbableSightings` now offers plateless detections that fall *between*
+two confirmed sightings to the same classifier, keeping one only if it links both
+backwards and forwards. Bounded at 200 candidates per gap so a busy hour cannot
+turn one query into thousands of comparisons.
+
+Verified on a seeded four-camera journey where the third leg had no plate:
+
+```
+1. 14:57:16  GNR-001  Ch-0 Circle North Approach    plate GJ 01 AB 1234
+2. 15:00:16  GNR-005  Mahatma Mandir Main Gate      plate GJ 01 AB 1234
+3. 15:05:56  GNR-014  Infocity Circle               plate (not read)     <- threaded in
+4. 15:08:16  GNR-017  Indroda Park Gate             plate GJO1AB1234
+
+CERTAIN   score n/a     634m / 180s = 12.7 km/h
+PROBABLE  score 0.772  8766m / 340s = 92.8 km/h
+PROBABLE  score 0.52   5228m / 140s = 134.4 km/h
+```
+
+The scores falling as the implied speed becomes less plausible is the scoring
+working, not a defect in it.
+
+### Verified by hand
+
+Link classification, in isolation: same plate at both ends → CERTAIN with a null
+score; an `O`-for-zero misread still CERTAIN; two different plates → no link;
+plateless with matching colour and type → PROBABLE; three seconds apart → refused
+as impossible; colour differing → refused; type differing → refused; an
+unsurveyed camera → refused; and every PROBABLE score strictly below 1.
+
+Through the API: the trail above answered in **437 ms**, and **1,255 ms** with
+probable threading — both well inside the five-second done-condition. The same
+vehicle is found by `gj01ab1234`, `GJ-01-AB-1234` and `GJO1AB1234`, all
+normalising to `GJ01AB1234`, through the same function the match engine uses.
+Facets return only values that actually occur. A plate of `---` is refused with
+*"contains no letters or digits to search on"*. An organizer gets 403.
+
+All seeded rows removed afterwards; detections, track points, alerts and
+watchlist are back to 0, and the 60-camera estate is untouched.
+
+### The PDF export
+
+`generateVehicleTrailPDF` was **added alongside** `generatePDFReport` rather than
+routed through it. That function renders a post-event safety report — its cover
+page says so, and its data shape requires an attendance figure and a safety
+score. Forcing a vehicle trail through it would have meant inventing both. The
+new export shares the module's jsPDF setup and visual language, prints the
+sighting table, and gives every inferred link its own paragraph of reasoning,
+because a "probable" row in a table is not evidence on its own.
+
+### Detection search
+
+`EventSearch` filters by camera, class, plate, colour and time range, with
+snapshots and CSV export of exactly the rows on screen — not the whole matching
+set, so the file cannot claim more than was fetched. Filter dropdowns are built
+from values that actually occur, so an empty dropdown means nothing has been
+recorded.
+
+Every response carries `samplingNote`. The detections table is a sample — one row
+per camera-track per interval, plus every plate-bearing detection — and "247
+results" must never read as "247 times this vehicle was seen".
+
+### Not verified
+
+The done-condition names *any vehicle in the sample footage*. There is no sample
+footage on this machine, no plate reader configured, and no Redis, so **no
+detection in any of this originated from a real frame**. What is proven is that
+given detections in the database, the trail is built correctly, ordered
+correctly, classified correctly and returned in about a second. The link from
+real video to a real plate row remains the same unverified gap as in Phases 3
+and 5. There was again no browser click-through.
+
+Gate still passes. `npm run build` exits 0; both `tsc --noEmit` exit 0.

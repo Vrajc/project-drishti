@@ -446,3 +446,142 @@ export const generatePDFReport = (data: ReportData) => {
   const fileName = `${data.eventData.name.replace(/\s+/g, '_')}_Safety_Report_${new Date().toISOString().split('T')[0]}.pdf`;
   doc.save(fileName);
 };
+
+// ============================================================================
+// Vehicle trail export
+//
+// Added alongside generatePDFReport rather than routed through it. That function
+// renders a post-event safety report - its cover page says so, and its data
+// shape requires an attendance figure and a safety score. Forcing a vehicle
+// trail through it would mean inventing both, so it shares this module's jsPDF
+// setup and visual language instead of its report structure.
+// ============================================================================
+
+export interface TrailSightingRow {
+  index: number;
+  timestamp: string;
+  cameraId: string;
+  cameraName: string;
+  location: string;
+  plateNumber: string | null;
+  color: string | null;
+  vehicleType: string | null;
+  /** How this sighting was linked to the one before it. Null for the first. */
+  linkToPrevious: { certainty: 'CERTAIN' | 'PROBABLE'; score: number | null; note: string } | null;
+}
+
+export interface TrailReport {
+  plateQuery: string;
+  normalisedPlate: string;
+  generatedAt: Date;
+  sightings: TrailSightingRow[];
+  /** Cameras seen in the trail that have never been surveyed. */
+  unmappableCameras: string[];
+  samplingNote: string;
+  trailNote: string;
+}
+
+export const generateVehicleTrailPDF = (report: TrailReport) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.width;
+
+  doc.setFillColor(26, 26, 30);
+  doc.rect(0, 0, pageWidth, 45, 'F');
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.text('DRISHTI', 14, 20);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'normal');
+  doc.text('Vehicle trail', 14, 30);
+  doc.setFontSize(9);
+  doc.text(`Generated ${report.generatedAt.toLocaleString()}`, 14, 38);
+
+  doc.setTextColor(0, 0, 0);
+  let y = 58;
+
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Plate searched: ${report.plateQuery}`, 14, y);
+  y += 6;
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'normal');
+  doc.text(`Matched as: ${report.normalisedPlate}`, 14, y);
+  y += 6;
+  doc.text(`${report.sightings.length} sighting(s) across the estate`, 14, y);
+  y += 10;
+
+  // The two caveats travel with the document. A trail printed and handed to
+  // someone else must carry what it is and is not, not rely on the reader having
+  // seen the screen it came from.
+  doc.setFontSize(8);
+  doc.setTextColor(90, 90, 90);
+  const caveats = doc.splitTextToSize(`${report.trailNote} ${report.samplingNote}`, pageWidth - 28);
+  doc.text(caveats, 14, y);
+  y += caveats.length * 4 + 6;
+
+  if (report.unmappableCameras.length > 0) {
+    doc.setTextColor(150, 60, 0);
+    const warning = doc.splitTextToSize(
+      `Not shown on any map: ${report.unmappableCameras.join(', ')} — these cameras have no ` +
+        'surveyed position, so their sightings are in the table but absent from the route.',
+      pageWidth - 28
+    );
+    doc.text(warning, 14, y);
+    y += warning.length * 4 + 4;
+  }
+
+  doc.setTextColor(0, 0, 0);
+
+  autoTable(doc, {
+    startY: y,
+    head: [['#', 'Time', 'Camera', 'Plate read', 'Colour', 'Link to previous']],
+    body: report.sightings.map((sighting) => [
+      String(sighting.index),
+      new Date(sighting.timestamp).toLocaleString(),
+      `${sighting.cameraId}\n${sighting.cameraName}`,
+      sighting.plateNumber ?? '—',
+      sighting.color ?? '—',
+      sighting.linkToPrevious === null
+        ? 'first sighting'
+        : sighting.linkToPrevious.certainty === 'CERTAIN'
+          ? 'same plate — certain'
+          : `probable (${Math.round((sighting.linkToPrevious.score ?? 0) * 100)}%)`,
+    ]),
+    theme: 'grid',
+    headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255], fontSize: 9 },
+    bodyStyles: { fontSize: 8, cellPadding: 2 },
+    columnStyles: { 0: { cellWidth: 10 }, 5: { cellWidth: 38 } },
+  });
+
+  // The reasoning behind every inferred link, spelled out. A "probable" row in
+  // the table above is not evidence on its own; this is what lets a reader
+  // check it.
+  const inferred = report.sightings.filter((s) => s.linkToPrevious?.certainty === 'PROBABLE');
+  if (inferred.length > 0) {
+    let afterTable = (doc as any).lastAutoTable?.finalY ?? y;
+    afterTable += 12;
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('How the probable links were reached', 14, afterTable);
+    afterTable += 7;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    for (const sighting of inferred) {
+      if (afterTable > doc.internal.pageSize.height - 25) {
+        doc.addPage();
+        afterTable = 20;
+      }
+      const lines = doc.splitTextToSize(
+        `#${sighting.index}: ${sighting.linkToPrevious!.note}`,
+        pageWidth - 28
+      );
+      doc.text(lines, 14, afterTable);
+      afterTable += lines.length * 4 + 3;
+    }
+  }
+
+  doc.save(`drishti-trail-${report.normalisedPlate}.pdf`);
+};
