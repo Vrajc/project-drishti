@@ -9,9 +9,11 @@ import DataTable from '../components/DataTable';
 import { generateEventReport } from '../services/ai.service';
 import { generatePDFReport } from '../utils/pdfGenerator';
 import { incidentService } from '../services/incident.service';
+import { useToast } from '../components/Toast';
 
 const PostEventReports: React.FC = () => {
   const { event } = useEvent();
+  const toast = useToast();
   const [selectedReport, setSelectedReport] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -187,19 +189,19 @@ const PostEventReports: React.FC = () => {
 
   const generateReport = async () => {
     if (!eventData) {
-      alert('No event data available to generate report.');
+      toast.error('No event selected', 'Choose an event before generating a report.');
       return;
     }
 
     // An unread incident list arrives here as an empty one, and the report
     // would go out stating that the event had no incidents.
     if (incidentsError) {
-      alert(`Incidents could not be read (${incidentsError}), so a report cannot be generated. Try again once they load.`);
+      toast.error('Incidents could not be read', `${incidentsError}. A report now would understate what happened.`);
       return;
     }
 
     if (!incidentsLoaded) {
-      alert('Incidents are still loading. Try again in a moment.');
+      toast.info('Still loading incidents', 'Try again in a moment.');
       return;
     }
 
@@ -229,7 +231,7 @@ const PostEventReports: React.FC = () => {
       generatePDFReport(pdfData);
     } catch (error) {
       console.error('Report generation error:', error);
-      alert('Failed to generate report. Please try again.');
+      toast.error('The report was not generated', 'Nothing was downloaded. Try again.');
     } finally {
       setIsGenerating(false);
     }

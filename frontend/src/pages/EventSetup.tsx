@@ -8,6 +8,7 @@ import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
 import { createEvent } from '../services/event.service';
+import { useToast } from '../components/Toast';
 
 /**
  * A zone as this form collects it.
@@ -35,6 +36,7 @@ const EventSetup: React.FC = () => {
   const navigate = useNavigate();
   const { addEvent } = useEvent();
   const { user } = useAuth();
+  const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -71,7 +73,7 @@ const EventSetup: React.FC = () => {
     e.preventDefault();
     
     if (!user?.email) {
-      alert('User email not found. Please log in again.');
+      toast.error('You are not signed in', 'Sign in again and retry.');
       return;
     }
 
@@ -112,12 +114,12 @@ const EventSetup: React.FC = () => {
           registeredUsers: []
         });
         
-        alert('Event created successfully!');
+        toast.success('Event created', `${eventData.name} is ready. Assign its cameras next.`);
         navigate('/organizer-dashboard');
       }
     } catch (error: any) {
       console.error('Error creating event:', error);
-      alert(error.message || 'Failed to create event. Please try again.');
+      toast.error('The event was not created', error.message || 'Try again.');
     } finally {
       setIsSubmitting(false);
     }

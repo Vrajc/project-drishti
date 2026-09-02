@@ -286,7 +286,7 @@ const EmergencyDispatch: React.FC = () => {
     try {
       // The server ranks the units that could serve this incident, nearest
       // surveyed unit first, and says whether it could rank by distance at all.
-      // Picking here from a list that hardcoded every unit as available meant
+      // Picking here from a list that showed every unit as available meant
       // sending a unit already committed somewhere else.
       const { units, rankedByDistance } = await dispatchService.getUnitsForIncident(emergency.id);
       const candidate = units.find((unit) => unit.status === 'available');

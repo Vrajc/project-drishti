@@ -9,6 +9,7 @@ import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
 import { incidentService, Incident as IncidentType } from '../services/incident.service';
 import crowdAnalysisService from '../services/crowdAnalysis.service';
+import { useToast } from '../components/Toast';
 
 interface Incident {
   _id?: string;
@@ -31,6 +32,7 @@ interface Incident {
 
 const LiveMonitoring: React.FC = () => {
   const { user } = useAuth();
+  const toast = useToast();
   const { getUserRegisteredEvents, getEventsByOrganizer } = useEvent();
   const navigate = useNavigate();
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -290,7 +292,7 @@ const LiveMonitoring: React.FC = () => {
       console.log('========================');
     } catch (error) {
       console.error('Error submitting incident:', error);
-      alert('Failed to submit incident. Please try again.');
+      toast.error('The report was not filed', 'Nothing was recorded. Try again.');
     }
   };
 
