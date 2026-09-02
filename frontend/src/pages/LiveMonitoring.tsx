@@ -16,6 +16,8 @@ interface Incident {
   type: 'medical' | 'security' | 'lost_found' | 'general';
   description: string;
   location: string;
+  /** The reporter's attachment, as a data URL. Null on reports without one. */
+  photo?: string | null;
   timestamp: Date;
   /** users.id of the reporter — an identifier, not a display value. */
   reporter: string;
@@ -46,6 +48,8 @@ const LiveMonitoring: React.FC = () => {
     location: ''
   });
   const [lostFoundImage, setLostFoundImage] = useState<File | null>(null);
+  const [lostFoundPhoto, setLostFoundPhoto] = useState<string | null>(null);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [crowdDensity, setCrowdDensity] = useState<any[]>([]);
   // Null until at least one CrowdDensity row has been read. A crowd level of 0%
   // asserts the venue is empty, which is a different claim from "nothing has
@@ -177,7 +181,7 @@ const LiveMonitoring: React.FC = () => {
       try {
         console.log('Loading incidents for event:', liveEvent.id);
         const data = await incidentService.getIncidentsByEvent(liveEvent.id);
-        console.log('Loaded incidents from MongoDB:', data.length);
+        console.log('Loaded incidents:', data.length);
         
         // Convert timestamp strings to Date objects
         const incidentsWithDates = data.map(inc => ({
@@ -261,10 +265,12 @@ const LiveMonitoring: React.FC = () => {
         type: newIncident.type,
         description: newIncident.description.trim(),
         location: newIncident.location,
+        // Only on a lost-and-found report, which is the only form that offers it.
+        photo: newIncident.type === 'lost_found' ? lostFoundPhoto : null,
       };
       
       const savedIncident = await incidentService.createIncident(incidentData);
-      console.log('Incident saved to MongoDB:', savedIncident);
+      console.log('Incident saved:', savedIncident);
       
       // Refresh incidents list
       const allIncidents = await incidentService.getIncidentsByEvent(liveEvent.id);
@@ -276,6 +282,8 @@ const LiveMonitoring: React.FC = () => {
       
       setNewIncident({ type: 'general', description: '', location: '' });
       setLostFoundImage(null);
+      setLostFoundPhoto(null);
+      setPhotoError(null);
       setShowReportForm(false);
       
       console.log('Total incidents now:', incidentsWithDates.length);
@@ -286,10 +294,56 @@ const LiveMonitoring: React.FC = () => {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  /**
+   * Reads the attachment and downscales it before it is sent.
+   *
+   * A phone photo is several megabytes and the report body carries it inline,
+   * so it is resized to fit within 1280px and re-encoded as JPEG. That is a
+   * lossy change to evidence, which is why it is stated in the form rather than
+   * done quietly, and the limit is generous enough to keep a face or a label
+   * legible.
+   */
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setLostFoundImage(file);
+    if (!file) return;
+
+    setLostFoundImage(file);
+    setPhotoError(null);
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(new Error('The file could not be read'));
+        reader.readAsDataURL(file);
+      });
+
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('That file is not an image this browser can read'));
+        img.src = dataUrl;
+      });
+
+      const MAX = 1280;
+      const scale = Math.min(1, MAX / Math.max(image.width, image.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(image.width * scale);
+      canvas.height = Math.round(image.height * scale);
+
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('This browser cannot process the image');
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+      setLostFoundPhoto(canvas.toDataURL('image/jpeg', 0.82));
+    } catch (error: any) {
+      // The attachment is dropped and the reporter is told, rather than the
+      // report being filed as though a photo went with it.
+      setLostFoundImage(null);
+      setLostFoundPhoto(null);
+      setPhotoError(null);
+      setLostFoundPhoto(null);
+      setPhotoError(error?.message ?? 'The photo could not be attached');
     }
   };
 
@@ -635,6 +689,24 @@ const LiveMonitoring: React.FC = () => {
                                 </div>
                                 
                                 <p className="text-sm sm:text-base text-ai-gray-400 mb-2 break-anywhere">{incident.description}</p>
+
+                                {/* The reporter's attachment. Shown at a size
+                                    where a face or a label is actually legible,
+                                    since that is the whole point of it. */}
+                                {incident.photo && (
+                                  <a
+                                    href={incident.photo}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-block mb-2"
+                                  >
+                                    <img
+                                      src={incident.photo}
+                                      alt={`Attached to the report at ${incident.location}`}
+                                      className="max-h-40 rounded-lg border border-ai-gray-800 object-cover"
+                                    />
+                                  </a>
+                                )}
                                 
                                 {/* Reporter/timestamp drops below the location
                                     instead of colliding with it on a phone */}
@@ -949,8 +1021,23 @@ const LiveMonitoring: React.FC = () => {
                         onChange={handleFileUpload}
                         className="w-full px-3 py-2 bg-ai-gray-800/50 border border-ai-gray-800 rounded-lg text-white file:mr-4 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-ai-white file:text-ai-black hover:file:bg-ai-gray-300"
                       />
-                      {lostFoundImage && (
-                        <p className="text-sm text-ai-gray-400 mt-1 break-anywhere">Selected: {lostFoundImage.name}</p>
+                      {lostFoundPhoto && (
+                        <div className="mt-2 flex items-start gap-3">
+                          <img
+                            src={lostFoundPhoto}
+                            alt="Attached to this report"
+                            className="w-20 h-20 object-cover rounded-lg border border-ai-gray-800"
+                          />
+                          <p className="text-xs text-ai-gray-500 break-anywhere">
+                            {lostFoundImage?.name}
+                            <span className="block mt-1">
+                              Resized to fit 1280px before sending, so it travels with the report.
+                            </span>
+                          </p>
+                        </div>
+                      )}
+                      {photoError && (
+                        <p className="text-sm text-red-400 mt-1 break-anywhere">{photoError}</p>
                       )}
                     </div>
                   )}

@@ -347,6 +347,14 @@ model Incident {
   description String
   location    String
 
+  // A photo attached by the reporter, as a data URL. The report form has always
+  // offered to attach one - for a lost child or a found bag it is most of the
+  // report - and the client had nowhere to send it, so every photo a reporter
+  // selected was discarded after the filename was shown back to them.
+  // Stored inline like Event.mapFile: this deployment has no object store, and
+  // a path to a file nothing writes would be worse than the bytes.
+  photo       String?
+
   // Where it happened, when that is known. An incident on a surveyed camera
   // inherits the camera's position; a manual report from an organizer has none,
   // and gets null rather than the venue's centroid.

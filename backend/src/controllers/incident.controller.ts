@@ -93,7 +93,7 @@ function formatIncident(inc: any) {
 // Create a new incident
 export const createIncident = async (req: AuthRequest, res: Response) => {
   try {
-    const { eventId, cameraId, type, description, location, severity } = req.body;
+    const { eventId, cameraId, type, description, location, severity, photo } = req.body;
 
     // The reporter is taken from the verified token, never from the request body. The
     // client used to send the user's display name, which violated incidents_reporter_fkey
@@ -115,6 +115,29 @@ export const createIncident = async (req: AuthRequest, res: Response) => {
 
     if (!description) {
       return res.status(400).json({ success: false, message: 'description is required' });
+    }
+
+    // A photo is optional, but a value that is not one must not be stored: a
+    // column holding something no <img> can render would show every viewer a
+    // broken attachment on a report that says it has one.
+    let storedPhoto: string | null = null;
+    if (photo !== undefined && photo !== null && photo !== '') {
+      const value = String(photo);
+      if (!/^data:image\/(png|jpe?g|webp|gif);base64,/.test(value)) {
+        return res.status(400).json({
+          success: false,
+          message: 'photo must be a base64 data URL for a PNG, JPEG, WebP or GIF image',
+        });
+      }
+      // Roughly 6MB of base64, under the 50mb body limit with room for the rest
+      // of the report. The client downscales before sending; this is the floor.
+      if (value.length > 6_000_000) {
+        return res.status(413).json({
+          success: false,
+          message: 'photo is too large — attach an image under about 4MB',
+        });
+      }
+      storedPhoto = value;
     }
 
     if (severity && !severityMap[severity]) {
@@ -171,6 +194,7 @@ export const createIncident = async (req: AuthRequest, res: Response) => {
         source: 'MANUAL',
         description,
         location: resolvedLocation,
+        photo: storedPhoto,
         latitude: camera?.latitude ?? null,
         longitude: camera?.longitude ?? null,
         reporter: user.id,

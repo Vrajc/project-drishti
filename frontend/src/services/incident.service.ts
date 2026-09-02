@@ -17,6 +17,13 @@ export interface IncidentData {
   type: 'medical' | 'security' | 'lost_found' | 'general';
   description: string;
   location: string;
+  /**
+   * A photo from the reporter, as a base64 data URL. Optional, and for a lost
+   * child or a found bag it is most of the report - the form has always offered
+   * to attach one, and until now the file was read, its name shown back as
+   * confirmation, and then dropped without ever leaving the browser.
+   */
+  photo?: string | null;
 }
 
 export interface Incident extends IncidentData {

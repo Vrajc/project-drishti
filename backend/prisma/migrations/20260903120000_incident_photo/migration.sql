@@ -1,0 +1,12 @@
+-- A reporter's photo, as a data URL.
+--
+-- The incident form has always had a file input on lost-and-found reports, and
+-- the client had nowhere to send what it collected: the file was read into
+-- component state, its name was shown back to the reporter as confirmation, and
+-- it was dropped when the form closed. For a lost child or a found bag the
+-- photograph is most of the report.
+--
+-- Stored inline, the way Event.mapFile already is. This deployment has no
+-- object store, and a column holding a path to a file nothing writes would be a
+-- worse lie than the bytes are an inefficiency.
+ALTER TABLE "incidents" ADD COLUMN "photo" TEXT;
