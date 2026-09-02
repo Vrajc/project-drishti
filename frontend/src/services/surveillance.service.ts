@@ -333,3 +333,73 @@ export const runCameraHealthCheck = async (id: string) => {
     rethrow(error, 'Probing camera');
   }
 };
+
+// ---------------------------------------------------------------------------
+// Estate crowd
+// ---------------------------------------------------------------------------
+
+export interface EstateZoneReading {
+  peopleCount: number;
+  densityPercentage: number;
+  timestamp: string;
+  /** The analyser's own confidence for the frame, or null if it reported none. */
+  confidence: number | null;
+  /** peopleCount / maxCapacity, or null when no capacity is declared. */
+  occupancyRatio: number | null;
+}
+
+export interface EstateZone {
+  id: string;
+  zoneId: string;
+  name: string;
+  maxCapacity: number;
+  camera: {
+    id: string;
+    cameraId: string;
+    name: string;
+    location: string;
+    status: CameraStatus;
+    latitude: number | null;
+    longitude: number | null;
+    site: CameraRef | null;
+  } | null;
+  /** Null means no count has ever been recorded — not an occupancy of zero. */
+  latest: EstateZoneReading | null;
+}
+
+export interface EstateCrowd {
+  zones: EstateZone[];
+  zonesDefined: number;
+  zonesReporting: number;
+  readings: number;
+}
+
+export const getEstateCrowd = async () => {
+  try {
+    const response = await axios.get<{ success: boolean; data: EstateCrowd }>(`${API_URL}/crowd`, {
+      headers: authHeaders(),
+    });
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Fetching estate crowd data');
+  }
+};
+
+/**
+ * Attaches a registry camera to an event, or releases it back to the registry.
+ *
+ * The server decides whether the caller may: an organizer only for their own
+ * events, admin and police for any. A refusal comes back with its reason.
+ */
+export const setCameraAssignment = async (cameraId: string, eventId: string | null) => {
+  try {
+    const response = await axios.put<{ success: boolean; data: RegistryCamera }>(
+      `${API_URL}/cameras/${cameraId}/assignment`,
+      { eventId },
+      { headers: { ...authHeaders(), 'Content-Type': 'application/json' } }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Changing the camera assignment');
+  }
+};

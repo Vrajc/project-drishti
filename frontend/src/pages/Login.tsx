@@ -42,7 +42,7 @@ const Login: React.FC = () => {
       } else if (formData.role === 'admin') {
         navigate('/admin-dashboard');
       } else if (formData.role === 'police') {
-        navigate('/surveillance/cameras');
+        navigate('/police/overview');
       }
     } catch (error: any) {
       setError(error.message || 'Login failed. Please check your credentials.');

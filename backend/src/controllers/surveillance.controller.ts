@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
 import * as surveillance from '../services/surveillance.service.js';
 import { ValidationError } from '../services/surveillance.service.js';
 import { runHealthSweep, getLastSweepSummary, config as healthConfig } from '../services/cameraHealth.service.js';
@@ -193,5 +194,53 @@ export const getHealthStatus = async (_req: Request, res: Response) => {
     });
   } catch (error: any) {
     fail(res, error, 'Failed to read health poller status');
+  }
+};
+
+/**
+ * Estate-wide crowd picture. Empty while no detector is running, and the client
+ * is told how many zones exist versus how many have ever reported, so an empty
+ * list reads as "not measured yet" rather than "nobody is there".
+ */
+export const getCrowd = async (_req: Request, res: Response) => {
+  try {
+    const data = await surveillance.getEstateCrowd();
+    res.status(200).json({ success: true, data });
+  } catch (error: any) {
+    fail(res, error, 'Failed to read estate crowd data');
+  }
+};
+
+/**
+ * Attach a registry camera to an event, or detach it.
+ *
+ * Organizers reach this for their own events; admin and police for any. The
+ * service enforces which, because the route middleware cannot see whose event
+ * is being targeted.
+ */
+export const setCameraAssignment = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ success: false, message: 'Authentication required' });
+    }
+
+    const raw = req.body?.eventId;
+    const eventId = raw === null || raw === undefined || raw === '' ? null : String(raw);
+
+    const camera = await surveillance.setCameraAssignment(req.params.id, eventId, req.user);
+    if (!camera) {
+      return res.status(404).json({ success: false, message: 'Camera not found' });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: eventId ? 'Camera assigned to the event' : 'Camera released back to the registry',
+      data: camera,
+    });
+  } catch (error: any) {
+    if (error?.name === 'ForbiddenError') {
+      return res.status(403).json({ success: false, message: error.message });
+    }
+    fail(res, error, 'Failed to change the camera assignment');
   }
 };

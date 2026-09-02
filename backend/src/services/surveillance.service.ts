@@ -611,3 +611,191 @@ export async function getCameraStream(id: string): Promise<StreamEndpoints | nul
     reason: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Estate crowd readings
+// ---------------------------------------------------------------------------
+
+/**
+ * The latest counted occupancy for every zone defined on a registry camera.
+ *
+ * This is the estate-wide counterpart to the event-scoped crowd endpoints: it
+ * answers "how busy is the estate right now" without an event existing, which
+ * is what makes crowd analytics available to a police operator at all.
+ *
+ * It reads CrowdDensity and nothing else. While no detector is running the list
+ * comes back empty and `readings: 0`, and the UI must render that as "no camera
+ * has reported a count yet" rather than as an estate with nobody in it. Those
+ * are different claims and only one of them is true.
+ */
+export async function getEstateCrowd() {
+  const zones = await prisma.zone.findMany({
+    where: { cameraId: { not: null } },
+    select: {
+      id: true,
+      zoneId: true,
+      name: true,
+      maxCapacity: true,
+      camera: {
+        select: {
+          id: true,
+          cameraId: true,
+          name: true,
+          location: true,
+          status: true,
+          latitude: true,
+          longitude: true,
+          site: { select: { id: true, code: true, name: true } },
+        },
+      },
+    },
+  });
+
+  // One query per zone would be N+1; instead take the recent readings for all
+  // of them at once and reduce to the newest per zone in memory.
+  const zoneIds = zones.map((z) => z.id);
+
+  const readings = zoneIds.length
+    ? await prisma.crowdDensity.findMany({
+        where: { zoneId: { in: zoneIds } },
+        orderBy: { timestamp: 'desc' },
+        take: zoneIds.length * 5,
+        select: {
+          id: true,
+          zoneId: true,
+          peopleCount: true,
+          densityPercentage: true,
+          timestamp: true,
+          confidence: true,
+        },
+      })
+    : [];
+
+  const latest = new Map<string, (typeof readings)[number]>();
+  for (const reading of readings) {
+    if (reading.zoneId && !latest.has(reading.zoneId)) latest.set(reading.zoneId, reading);
+  }
+
+  const totalReadings = await prisma.crowdDensity.count();
+
+  return {
+    zones: zones.map((zone) => {
+      const reading = latest.get(zone.id) ?? null;
+
+      return {
+        id: zone.id,
+        zoneId: zone.zoneId,
+        name: zone.name,
+        maxCapacity: zone.maxCapacity,
+        camera: zone.camera,
+        // Null means no count has ever been recorded for this zone. Callers
+        // must print an empty state, never a zero occupancy.
+        latest: reading
+          ? {
+              peopleCount: reading.peopleCount,
+              densityPercentage: reading.densityPercentage,
+              timestamp: reading.timestamp,
+              confidence: reading.confidence,
+              occupancyRatio: zone.maxCapacity > 0 ? reading.peopleCount / zone.maxCapacity : null,
+            }
+          : null,
+      };
+    }),
+    zonesDefined: zones.length,
+    zonesReporting: latest.size,
+    readings: totalReadings,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Assigning registry cameras to an event
+// ---------------------------------------------------------------------------
+
+export class ForbiddenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
+/**
+ * Attaches a registry camera to an event, or detaches it.
+ *
+ * This is the step that turns the standalone estate into an event's camera set,
+ * and it is deliberately narrow about who may do it. An organizer may only
+ * attach a camera to an event they own, and may only detach one that is
+ * currently on an event they own - otherwise an organizer could quietly take a
+ * camera off another organizer's live event, or claim one that is already in
+ * use elsewhere.
+ */
+export async function setCameraAssignment(
+  cameraId: string,
+  eventId: string | null,
+  actor: { userId: string; role: string }
+) {
+  const camera = await prisma.camera.findUnique({
+    where: { id: cameraId },
+    select: { id: true, cameraId: true, eventId: true },
+  });
+  if (!camera) return null;
+
+  const isOperator = actor.role === 'admin' || actor.role === 'police';
+
+  if (!isOperator) {
+    // Detaching: the camera must currently be on one of the actor's events.
+    if (camera.eventId) {
+      const current = await prisma.event.findUnique({
+        where: { id: camera.eventId },
+        select: { organizerId: true, name: true },
+      });
+      if (current?.organizerId !== actor.userId) {
+        throw new ForbiddenError(
+          `Camera "${camera.cameraId}" is assigned to an event you do not organise.`
+        );
+      }
+    }
+
+    // Attaching: the target event must be one of the actor's.
+    if (eventId) {
+      const target = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { organizerId: true },
+      });
+      if (!target) throw new ValidationError(`Event "${eventId}" does not exist`);
+      if (target.organizerId !== actor.userId) {
+        throw new ForbiddenError('You can only assign cameras to an event you organise.');
+      }
+    }
+  } else if (eventId) {
+    const target = await prisma.event.findUnique({ where: { id: eventId }, select: { id: true } });
+    if (!target) throw new ValidationError(`Event "${eventId}" does not exist`);
+  }
+
+  // A camera already on another event is moved rather than duplicated, but the
+  // caller is told, because taking a camera off a live event is not a quiet act.
+  if (eventId && camera.eventId && camera.eventId !== eventId) {
+    const previous = await prisma.event.findUnique({
+      where: { id: camera.eventId },
+      select: { name: true },
+    });
+    if (previous && !isOperator) {
+      throw new ForbiddenError(
+        `Camera "${camera.cameraId}" is already assigned to "${previous.name}". ` +
+          'Release it there first.'
+      );
+    }
+  }
+
+  // The registry keeps its own cameraId when a camera joins an event; the
+  // composite key is (eventId, cameraId), so a clash is possible and refused
+  // with a readable message rather than a raw P2002.
+  await assertCameraIdFree(camera.cameraId, eventId, camera.id);
+
+  const updated = await prisma.camera.update({
+    where: { id: cameraId },
+    data: eventId ? { event: { connect: { id: eventId } } } : { event: { disconnect: true } },
+    include: cameraInclude,
+  });
+
+  return formatCamera(updated);
+}

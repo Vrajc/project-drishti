@@ -13,6 +13,8 @@ import {
   runHealthCheck,
   runCameraHealthCheck,
   getHealthStatus,
+  getCrowd,
+  setCameraAssignment,
 } from '../controllers/surveillance.controller.js';
 
 const router = Router();
@@ -39,8 +41,16 @@ router.post('/cameras/:id/health-check', authenticate, canWrite, runCameraHealth
 router.post('/health-check', authenticate, canWrite, runHealthCheck);
 router.get('/health', authenticate, canRead, getHealthStatus);
 
+// Assignment is how a registry camera joins an event. Organizers need it for
+// their own events, so it is behind canRead and the service checks ownership -
+// the middleware cannot see which event is being targeted.
+router.put('/cameras/:id/assignment', authenticate, canRead, setCameraAssignment);
+
 router.get('/departments', authenticate, canRead, getDepartments);
 router.get('/sites', authenticate, canRead, getSites);
 router.get('/stats', authenticate, canRead, getStats);
+
+// Estate-wide occupancy, the counterpart to the event-scoped crowd-analysis API.
+router.get('/crowd', authenticate, canRead, getCrowd);
 
 export default router;

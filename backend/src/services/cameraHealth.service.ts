@@ -2,6 +2,8 @@ import { CameraStatus, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma.js';
 import { probeStream } from '../utils/streamProbe.js';
 import { decryptCredential, isCredentialEncryptionConfigured } from '../utils/credentialCrypto.js';
+import { evaluateCameraHealth } from './anomalyRules.service.js';
+import { emitIncident } from '../lib/realtime.js';
 
 // ============================================================================
 // The camera health poller.
@@ -46,8 +48,18 @@ export interface SweepSummary {
   probed: number;
   skipped: number;
   byStatus: Record<string, number>;
-  changed: Array<{ cameraId: string; from: CameraStatus; to: CameraStatus; reason: string | null }>;
+  // `id` is the camera's UUID and `cameraId` its human identifier. The anomaly
+  // rule engine needs the former to write a foreign key; the log prints the latter.
+  changed: Array<{
+    id: string;
+    cameraId: string;
+    from: CameraStatus;
+    to: CameraStatus;
+    reason: string | null;
+  }>;
   prunedHealthRows: number;
+  /** Incidents the rule engine raised from this sweep's transitions. */
+  anomaliesRaised: number;
 }
 
 interface ProbeTarget {
@@ -171,7 +183,13 @@ export async function runHealthSweep(cameraIds?: string[]): Promise<SweepSummary
     byStatus[status] = (byStatus[status] ?? 0) + 1;
 
     if (target.status !== status) {
-      changed.push({ cameraId: target.cameraId, from: target.status, to: status, reason: result.error });
+      changed.push({
+        id: target.id,
+        cameraId: target.cameraId,
+        from: target.status,
+        to: status,
+        reason: result.error,
+      });
     }
 
     healthRows.push({
@@ -233,6 +251,36 @@ export async function runHealthSweep(cameraIds?: string[]): Promise<SweepSummary
     console.error('Health sweep: pruning old health rows failed:', error.message);
   }
 
+  // A status transition is the only evidence of a camera fault this system has,
+  // and it is real: a probe reached the stream last sweep and did not this one.
+  // Turning it into an incident is what puts a genuine anomaly in front of a
+  // police operator without any detector being involved.
+  let anomaliesRaised = 0;
+  if (changed.length > 0) {
+    try {
+      const raised = await evaluateCameraHealth(changed);
+      anomaliesRaised = raised.length;
+
+      for (const incident of raised) {
+        emitIncident('incident:new', {
+          _id: incident.id,
+          id: incident.id,
+          eventId: incident.eventId,
+          cameraId: incident.cameraId,
+          ruleKey: incident.ruleKey,
+          severity: incident.severity.toLowerCase(),
+          description: incident.description,
+          source: 'anomaly',
+          status: 'open',
+        });
+      }
+    } catch (error: any) {
+      // A failure to raise the incident must not lose the health data that was
+      // already written - the probe results are the more important record.
+      console.error('📷 Anomaly rules failed on health transitions:', error.message);
+    }
+  }
+
   const finishedAt = new Date();
   const summary: SweepSummary = {
     startedAt,
@@ -243,6 +291,7 @@ export async function runHealthSweep(cameraIds?: string[]): Promise<SweepSummary
     byStatus,
     changed,
     prunedHealthRows,
+    anomaliesRaised,
   };
 
   lastSummary = summary;
@@ -290,6 +339,10 @@ export function startHealthPoller(): void {
             'interval, so ticks are being skipped. Raise CAMERA_HEALTH_CONCURRENCY, lower ' +
             'CAMERA_HEALTH_TIMEOUT_MS, or lengthen CAMERA_HEALTH_POLL_SECONDS.'
         );
+      }
+
+      if (summary.anomaliesRaised > 0) {
+        console.log(`   ${summary.anomaliesRaised} anomaly incident(s) raised from those transitions`);
       }
 
       for (const change of summary.changed) {

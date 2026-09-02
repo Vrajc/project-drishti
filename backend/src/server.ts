@@ -1,4 +1,5 @@
 import express, { Express, Request, Response } from 'express';
+import { createServer } from 'http';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { connectDatabase } from './config/database.js';
@@ -10,9 +11,16 @@ import aiRoutes from './routes/ai.routes.js';
 import incidentRoutes from './routes/incident.routes.js';
 import crowdAnalysisRoutes from './routes/crowdAnalysis.routes.js';
 import surveillanceRoutes from './routes/surveillance.routes.js';
+import watchlistRoutes from './routes/watchlist.routes.js';
+import alertRoutes from './routes/alert.routes.js';
+import trackingRoutes from './routes/tracking.routes.js';
+import dispatchRoutes from './routes/dispatch.routes.js';
 import { listModels } from './utils/openai.service.js';
 import { seedTestUser } from './utils/seedDatabase.js';
 import { startHealthPoller } from './services/cameraHealth.service.js';
+import { startDetectionConsumer } from './services/detectionConsumer.service.js';
+import { startMatchEngine } from './services/matchEngine.service.js';
+import { initRealtime } from './lib/realtime.js';
 
 // Load environment variables
 dotenv.config();
@@ -58,6 +66,10 @@ app.use('/api/ai', aiRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/crowd-analysis', crowdAnalysisRoutes);
 app.use('/api/surveillance', surveillanceRoutes);
+app.use('/api/watchlist', watchlistRoutes);
+app.use('/api/alerts', alertRoutes);
+app.use('/api/tracking', trackingRoutes);
+app.use('/api/dispatch', dispatchRoutes);
 
 // Health check route
 app.get('/health', (req: Request, res: Response) => {
@@ -79,6 +91,12 @@ const startServer = async () => {
       // Only started once the database is reachable - a poller that cannot
       // record what it found is worse than no poller.
       startHealthPoller();
+      // Turns the ai-service's detections into real CrowdDensity rows. It
+      // retries on its own if Redis is not up yet, so it never blocks boot.
+      void startDetectionConsumer();
+      // Its own consumer group on the same stream, so a stall in one cannot
+      // hold up the other.
+      void startMatchEngine();
     } catch (dbError) {
       if (requiresDatabase) {
         console.error('❌ Prisma Postgres connection failed in production.');
@@ -90,7 +108,12 @@ const startServer = async () => {
       console.warn('Check your Prisma Postgres DATABASE_URL and network access');
     }
     
-    const server = app.listen(PORT, () => {
+    // Socket.IO shares the HTTP server rather than opening a second port, so
+    // one origin, one CORS policy and one JWT cover both transports.
+    const server = createServer(app);
+    initRealtime(server, allowedOrigins as string[]);
+
+    server.listen(PORT, () => {
       console.log(`🚀 Server is running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📍 API available at: http://localhost:${PORT}`);

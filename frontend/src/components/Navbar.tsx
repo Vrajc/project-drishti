@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { getAlertCounts } from '../services/watchlist.service';
+import { onRealtime } from '../lib/socket';
 import { LogOut, Menu, X, User } from 'lucide-react';
 
 const Navbar: React.FC = () => {
@@ -9,6 +11,42 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Alerts nobody has looked at yet. Null until the count is known, so the badge
+  // is absent rather than showing a zero it has not verified.
+  const [unhandledAlerts, setUnhandledAlerts] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (user?.role !== 'police' && user?.role !== 'admin') {
+      setUnhandledAlerts(null);
+      return;
+    }
+
+    let cancelled = false;
+    const refresh = () => {
+      getAlertCounts()
+        .then((counts) => {
+          if (!cancelled) setUnhandledAlerts(counts.unhandled);
+        })
+        .catch(() => {
+          // A badge is not worth an error banner in the navigation. The alerts
+          // console reports the failure properly; here it simply goes absent.
+          if (!cancelled) setUnhandledAlerts(null);
+        });
+    };
+
+    refresh();
+    const offNew = onRealtime('alert:new', refresh);
+    const offUpdated = onRealtime('alert:updated', refresh);
+    const interval = setInterval(refresh, 30000);
+
+    return () => {
+      cancelled = true;
+      offNew();
+      offUpdated();
+      clearInterval(interval);
+    };
+  }, [user?.role]);
 
   // Close the drawer on navigation so it never lingers over the new page
   useEffect(() => {
@@ -58,17 +96,32 @@ const Navbar: React.FC = () => {
       case 'admin':
         // The camera registry is estate-wide, so it sits in the nav rather than
         // behind an event the way the organizer pages do.
+        // Admin can reach every police route, so the nav offers them rather
+        // than leaving pages that exist and cannot be navigated to.
         return [
           { label: 'Dashboard', path: '/admin-dashboard' },
-          { label: 'Camera Registry', path: '/surveillance/cameras' },
-          { label: 'Camera Map', path: '/surveillance/map' },
-          { label: 'Live Wall', path: '/surveillance/live-wall' }
+          { label: 'Alerts', path: '/police/alerts', badge: unhandledAlerts },
+          { label: 'Watchlist', path: '/police/watchlist' },
+          { label: 'Vehicle Trail', path: '/police/tracking' },
+          { label: 'Search', path: '/police/search' },
+          { label: 'Dispatch', path: '/police/dispatch' },
+          { label: 'Cameras', path: '/surveillance/cameras' }
         ];
       case 'police':
+        // Operations first, estate second. A police operator's job starts at
+        // the incident queue; the registry is the reference material behind it.
         return [
-          { label: 'Camera Registry', path: '/surveillance/cameras' },
-          { label: 'Camera Map', path: '/surveillance/map' },
-          { label: 'Live Wall', path: '/surveillance/live-wall' }
+          { label: 'Overview', path: '/police/overview' },
+          { label: 'Alerts', path: '/police/alerts', badge: unhandledAlerts },
+          { label: 'Watchlist', path: '/police/watchlist' },
+          { label: 'Vehicle Trail', path: '/police/tracking' },
+          { label: 'Search', path: '/police/search' },
+          { label: 'Dispatch', path: '/police/dispatch' },
+          // One entry into the surveillance group. Registry, map and live wall
+          // link to each other, so nothing is lost by not listing all three -
+          // and nine items overflowed a nav whose scrollbar is deliberately
+          // hidden, which made the last of them unreachable.
+          { label: 'Cameras', path: '/surveillance/cameras' }
         ];
       default:
         return [];
@@ -94,7 +147,7 @@ const Navbar: React.FC = () => {
         navigate('/admin-dashboard');
         break;
       case 'police':
-        navigate('/surveillance/cameras');
+        navigate('/police/overview');
         break;
       default:
         navigate('/');
@@ -153,6 +206,11 @@ const Navbar: React.FC = () => {
                 }`}
               >
                 {item.label}
+                {item.badge ? (
+                  <span className="ml-1.5 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold align-middle">
+                    {item.badge}
+                  </span>
+                ) : null}
               </motion.button>
             ))}
           </div>
@@ -161,7 +219,11 @@ const Navbar: React.FC = () => {
             <div className="hidden md:flex items-center gap-3">
               <div className="flex items-center gap-2 px-3 py-1.5 bg-ai-gray-900 rounded-lg border border-ai-gray-800 max-w-[16rem]">
                 <User className="w-4 h-4 text-ai-gray-400 shrink-0" />
-                <span className="text-sm text-ai-gray-300 truncate">{user?.name}</span>
+                {/* The name yields to the navigation below xl. Seven destinations
+                    plus a full name overflowed a nav whose scrollbar is hidden,
+                    which silently put the last item out of reach. The role pill
+                    stays, and the drawer still shows the name in full. */}
+                <span className="hidden xl:inline text-sm text-ai-gray-300 truncate">{user?.name}</span>
                 <span className="px-2 py-0.5 bg-ai-white text-ai-black rounded text-xs font-medium shrink-0">
                   {user?.role}
                 </span>
@@ -240,6 +302,11 @@ const Navbar: React.FC = () => {
                       }`}
                     >
                       {item.label}
+                      {item.badge ? (
+                        <span className="ml-2 px-1.5 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                          {item.badge}
+                        </span>
+                      ) : null}
                     </motion.button>
                   ))}
 

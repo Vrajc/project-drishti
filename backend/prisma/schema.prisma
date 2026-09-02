@@ -25,9 +25,14 @@ model User {
   updatedAt    DateTime @updatedAt
 
   // Relations
-  organizedEvents   Event[]             @relation("OrganizedEvents")
-  registeredEvents  EventRegistration[]
-  reportedIncidents Incident[]
+  acknowledgedAlerts     Alert[]              @relation("AcknowledgedAlerts")
+  issuedWatchlistEntries WatchlistEntry[]     @relation("IssuedWatchlistEntries")
+  organizedEvents        Event[]              @relation("OrganizedEvents")
+  registeredEvents       EventRegistration[]
+  reportedIncidents      Incident[]
+  // Dispatches this user ordered. Police and admin are the only roles the
+  // dispatch routes admit, so in practice this is a police operator's log.
+  dispatches             DispatchAssignment[] @relation("DispatchedBy")
 
   @@index([email])
   @@index([role])
@@ -79,9 +84,15 @@ model Event {
 // ============================================
 // ZONE MODEL (Sub-entity of Event)
 // ============================================
+// A zone is a counting region. It belongs to an event (the organizer's layout)
+// or to a registry camera (a standing region of interest on the estate, which
+// is what lets police crowd analytics exist without an event). Exactly one of
+// `eventId` / `cameraId` is set — enforced by zones_scope_check in the
+// add_police_operations migration.
 model Zone {
   id          String   @id @default(uuid())
-  eventId     String
+  eventId     String?
+  cameraId    String?
   zoneId      String // Custom zone identifier
   name        String
   coordinates Json // Array of {x, y} coordinates
@@ -91,11 +102,16 @@ model Zone {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  event          Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event          Event?         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  camera         Camera?        @relation(fields: [cameraId], references: [id], onDelete: Cascade)
   crowdDensities CrowdDensity[]
 
+  // Guards event zones only: Postgres treats NULLs as distinct, so two camera
+  // zones could both claim the same zoneId. zones_camera_zoneId_key, a partial
+  // unique index in the migration, closes that the way Phase 1 did for cameras.
   @@unique([eventId, zoneId])
   @@index([eventId])
+  @@index([cameraId])
   @@map("zones")
 }
 
@@ -155,6 +171,11 @@ model Camera {
   site           Site?          @relation(fields: [siteId], references: [id], onDelete: SetNull)
   crowdDensities CrowdDensity[]
   healthChecks   CameraHealth[]
+  detections     Detection[]
+  alerts         Alert[]
+  trackPoints    TrackPoint[]
+  zones          Zone[]
+  incidents      Incident[]
 
   @@unique([eventId, cameraId])
   @@index([eventId])
@@ -183,8 +204,9 @@ model Department {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  sites   Site[]
-  cameras Camera[]
+  sites         Site[]
+  cameras       Camera[]
+  dispatchUnits DispatchUnit[]
 
   @@map("departments")
 }
@@ -205,6 +227,7 @@ model Site {
 
   department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   cameras    Camera[]
+  incidents  Incident[]
 
   @@index([departmentId])
   @@map("sites")
@@ -234,24 +257,51 @@ model CameraHealth {
 // ============================================
 // DISPATCH UNIT MODEL (Sub-entity of Event)
 // ============================================
+// A responder unit. Event units are the organizer's own marshals and medics;
+// registry units (eventId null, departmentId set) are the standing estate
+// resources a police operator dispatches. Same table, because dispatching is
+// the same act either way and the console should not care which it is.
 model DispatchUnit {
-  id        String   @id @default(uuid())
-  eventId   String
-  unitId    String // Custom unit identifier
-  name      String
-  type      String
-  contact   String
-  capacity  Int
-  location  String
+  id           String  @id @default(uuid())
+  eventId      String?
+  departmentId String?
+  unitId       String // Custom unit identifier
+  name         String
+  type         String
+  contact      String
+  capacity     Int
+  location     String
+
+  // WGS84, and null until someone has actually surveyed the unit's base. The
+  // nearest-unit computation skips units without a position rather than
+  // guessing one - the same rule the camera map follows.
+  latitude  Float?
+  longitude Float?
+
+  status DispatchUnitStatus @default(AVAILABLE)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event       Event?               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  department  Department?          @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  assignments DispatchAssignment[]
 
+  // Event units only, for the same NULL-distinctness reason as Zone and Camera.
+  // dispatch_units_registry_unitId_key covers registry units in the migration.
   @@unique([eventId, unitId])
   @@index([eventId])
+  @@index([departmentId])
+  @@index([status])
   @@map("dispatch_units")
+}
+
+enum DispatchUnitStatus {
+  AVAILABLE
+  DISPATCHED
+  BUSY
+  OFFLINE
 }
 
 // ============================================
@@ -276,30 +326,129 @@ model EventRegistration {
 // ============================================
 // INCIDENT MODEL
 // ============================================
+// An incident is raised either against an event (an organizer's marshal reports
+// it) or against a registry camera (the estate raised it, with no event
+// involved). At least one of `eventId` / `cameraId` is always set - enforced by
+// incidents_scope_check in the add_police_operations migration - so nothing can
+// land in the table with no jurisdiction at all.
 model Incident {
-  id            String         @id @default(uuid())
-  eventId       String
-  type          IncidentType
-  description   String
-  location      String
-  timestamp     DateTime       @default(now())
-  reporter      String
+  id       String  @id @default(uuid())
+  eventId  String?
+  cameraId String?
+  siteId   String?
+
+  type        IncidentType
+  severity    IncidentSeverity @default(MEDIUM)
+  source      IncidentSource   @default(MANUAL)
+  description String
+  location    String
+
+  // Where it happened, when that is known. An incident on a surveyed camera
+  // inherits the camera's position; a manual report from an organizer has none,
+  // and gets null rather than the venue's centroid.
+  latitude  Float?
+  longitude Float?
+
+  timestamp DateTime @default(now())
+
+  // Null for SOURCE=ANOMALY: the rule engine raised it, and attributing a
+  // machine-raised incident to a person would be a lie in the audit trail.
+  reporter      String?
   reporterEmail String?
-  status        IncidentStatus @default(OPEN)
-  responseTime  Int? // in seconds
-  resolvedAt    DateTime?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+
+  status       IncidentStatus @default(OPEN)
+  responseTime Int? // seconds from timestamp to resolvedAt, written only on a real resolution
+  resolvedAt   DateTime?
+
+  // Set only by the anomaly rule engine, and only to a value it computed. It is
+  // the rule's own confidence (e.g. occupancy over capacity), never a range.
+  detectionConfidence Float?
+  // The rule that fired, e.g. "CAMERA_OFFLINE". Null for manual reports.
+  ruleKey             String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  event        Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
-  reporterUser User  @relation(fields: [reporter], references: [id])
+  event        Event?               @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  camera       Camera?              @relation(fields: [cameraId], references: [id], onDelete: SetNull)
+  site         Site?                @relation(fields: [siteId], references: [id], onDelete: SetNull)
+  reporterUser User?                @relation(fields: [reporter], references: [id])
+  assignments  DispatchAssignment[]
 
   @@index([eventId])
   @@index([eventId, status])
   @@index([eventId, timestamp])
+  @@index([cameraId])
+  @@index([cameraId, timestamp])
   @@index([status])
+  @@index([status, severity])
+  @@index([source, ruleKey, timestamp])
   @@map("incidents")
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+// How the incident came to exist. MANUAL is a human report; ANOMALY is the rule
+// engine acting on measured data. Nothing else may write ANOMALY.
+enum IncidentSource {
+  MANUAL
+  ANOMALY
+}
+
+// ============================================
+// DISPATCH ASSIGNMENT MODEL
+// ============================================
+// The dispatch audit trail: who sent which unit to what, and what happened
+// next. Every timestamp below is null until that thing actually happened, so
+// "acknowledged in 40s" can only ever be read off a real acknowledgement.
+model DispatchAssignment {
+  id           String         @id @default(uuid())
+  incidentId   String
+  unitId       String
+  dispatchedBy String // users.id of the operator who ordered it
+  status       DispatchStatus @default(DISPATCHED)
+
+  dispatchedAt   DateTime  @default(now())
+  acknowledgedAt DateTime?
+  arrivedAt      DateTime?
+  clearedAt      DateTime?
+
+  // Written only when a routing service actually answered, and left null
+  // otherwise. The console renders null as "ETA unavailable" - it does not
+  // estimate. `straightLineM` is a haversine on two stored coordinates, which
+  // is a real measurement of a real distance, just not a road distance.
+  etaSeconds     Int?
+  routeDistanceM Float?
+  straightLineM  Float?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  incident   Incident     @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  unit       DispatchUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  dispatcher User         @relation("DispatchedBy", fields: [dispatchedBy], references: [id])
+
+  @@index([incidentId])
+  @@index([unitId])
+  @@index([status])
+  @@index([dispatchedAt])
+  @@map("dispatch_assignments")
+}
+
+enum DispatchStatus {
+  DISPATCHED
+  ACKNOWLEDGED
+  ARRIVED
+  CLEARED
+  CANCELLED
 }
 
 enum IncidentType {
@@ -318,10 +467,13 @@ enum IncidentStatus {
 // ============================================
 // CROWD DENSITY MODEL
 // ============================================
+// A counted reading for one zone at one moment. `eventId` is null for readings
+// taken on a registry camera's own zone, which is what makes crowd analytics
+// available to police outside any event.
 model CrowdDensity {
   id                String   @id @default(uuid())
-  eventId           String
-  zoneId            String
+  eventId           String?
+  zoneId            String?
   zoneName          String
   peopleCount       Int
   densityPercentage Float
@@ -339,7 +491,7 @@ model CrowdDensity {
   updatedAt DateTime @updatedAt
 
   // Relations
-  event  Event   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  event  Event?  @relation(fields: [eventId], references: [id], onDelete: Cascade)
   zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
   camera Camera? @relation(fields: [cameraId], references: [id], onDelete: SetNull)
 
@@ -421,4 +573,199 @@ enum NotificationPriority {
   NORMAL
   HIGH
   CRITICAL
+}
+
+// ============================================================================
+// WATCHLIST, DETECTIONS AND ALERTS (Phase 5)
+// ============================================================================
+
+enum WatchlistEntityType {
+  VEHICLE
+  PERSON
+}
+
+/**
+ * How a match was arrived at. Stored rather than inferred from the score,
+ * because a caller must be able to tell an exact plate match from a fuzzy one
+ * without reverse-engineering a threshold.
+ */
+enum MatchType {
+  PLATE_EXACT
+  PLATE_FUZZY
+  FACE
+}
+
+enum AlertStatus {
+  NEW
+  ACKNOWLEDGED
+  DISPATCHED
+  CLOSED
+  FALSE_POSITIVE
+}
+
+model WatchlistEntry {
+  id         String              @id @default(uuid())
+  entityType WatchlistEntityType
+
+  // --- Vehicle ---
+  // The plate as it was entered, kept verbatim for display. `plateNormalised`
+  // is what the match engine compares against: uppercase, punctuation stripped,
+  // and the O/0 and I/1 confusions folded. Both are stored because showing an
+  // operator a normalised plate they did not type would be its own small lie.
+  plateNumber      String?
+  plateNormalised  String?
+  vehicleMakeModel String?
+  color            String?
+
+  // --- Person ---
+  personName String?
+  photoUrl   String?
+  // Face embedding, for the pgvector matching that is deliberately out of scope
+  // here. Null on every row until that exists; nothing reads it yet.
+  embedding  Json?
+
+  // --- Provenance. A watchlist entry is a legal act, so it records one. ---
+  caseNumber String
+  caseType   String
+  severity   IncidentSeverity @default(MEDIUM)
+  issuedBy   String
+  issuedAt   DateTime         @default(now())
+  expiresAt  DateTime?
+  isActive   Boolean          @default(true)
+  notes      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issuer User?   @relation("IssuedWatchlistEntries", fields: [issuedBy], references: [id])
+  alerts Alert[]
+
+  // The match engine loads active entries by normalised plate on every
+  // detection carrying a plate, so this index is on the hot path.
+  @@index([plateNormalised])
+  @@index([isActive, entityType])
+  @@index([caseNumber])
+  @@map("watchlist_entries")
+}
+
+/**
+ * A persisted detection.
+ * NOT a complete record of everything the detector saw, and must never be
+ * presented as one. The ai-service samples several frames a second per camera;
+ * storing every detection would be tens of millions of rows a day. What is kept
+ * is: the first sighting of each track on each camera, a refresh every
+ * DETECTION_PERSIST_INTERVAL_SECONDS while that track is still in view, and
+ * every detection that carried a plate reading. The sampling rule is documented
+ * on the search endpoint so a caller knows what "all detections" means.
+ */
+model Detection {
+  id       String @id @default(uuid())
+  cameraId String
+
+  // Stable per camera between stream discontinuities. Null when the tracker had
+  // not yet associated the box with a track.
+  trackId         Int?
+  // The tracker generation this trackId belongs to. Two detections with the same
+  // trackId in different generations are not the same object - a reconnect reset
+  // the tracker in between.
+  trackGeneration Int  @default(0)
+
+  objectClass String
+  confidence  Float
+  // [x, y, w, h] in the frame's own pixel coordinates.
+  bbox        Json
+
+  // Null unless a plate detector and OCR actually read one.
+  plateNumber     String?
+  plateNormalised String?
+  plateConfidence Float?
+  // Measured from the crop's pixels, null when it could not be determined.
+  color           String?
+  vehicleType     String?
+
+  // Relative path, resolved by the client against its own snapshot mount.
+  snapshotPath String?
+
+  ts        DateTime
+  createdAt DateTime @default(now())
+
+  camera Camera  @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  alerts Alert[]
+
+  @@index([cameraId, ts])
+  @@index([plateNormalised])
+  @@index([plateNumber])
+  @@index([ts])
+  @@index([objectClass, ts])
+  @@map("detections")
+}
+
+/**
+ * A watchlist hit.
+ * `matchScore` is always computed - by the match engine, from the edit distance
+ * between the normalised plates - and never assigned a plausible-looking value.
+ * An alert always points at the Detection that caused it, so an operator can see
+ * the frame rather than take the system's word for it.
+ */
+model Alert {
+  id               String @id @default(uuid())
+  watchlistEntryId String
+  detectionId      String
+  cameraId         String
+
+  matchType  MatchType
+  matchScore Float
+  ts         DateTime
+
+  status         AlertStatus @default(NEW)
+  acknowledgedBy String?
+  acknowledgedAt DateTime?
+  notes          String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  watchlistEntry WatchlistEntry @relation(fields: [watchlistEntryId], references: [id], onDelete: Cascade)
+  detection      Detection      @relation(fields: [detectionId], references: [id], onDelete: Cascade)
+  camera         Camera         @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  acknowledger   User?          @relation("AcknowledgedAlerts", fields: [acknowledgedBy], references: [id])
+
+  @@index([status, ts])
+  @@index([watchlistEntryId, ts])
+  @@index([cameraId, ts])
+  @@index([ts])
+  @@map("alerts")
+}
+
+/**
+ * One position of one track at one moment, for cross-camera route history.
+ * lat/lng are the CAMERA's surveyed position, not the object's - this system
+ * cannot place an object within a camera's field of view. A route drawn from
+ * these is a sequence of cameras that saw the vehicle, which is what it must be
+ * labelled as. Rows only exist for cameras that have been surveyed.
+ */
+model TrackPoint {
+  id       String @id @default(uuid())
+  cameraId String
+
+  trackId         Int
+  trackGeneration Int @default(0)
+
+  ts  DateTime
+  lat Float
+  lng Float
+
+  plateNormalised String?
+  plateNumber     String?
+  objectClass     String?
+
+  createdAt DateTime @default(now())
+
+  camera Camera @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+
+  @@index([plateNormalised, ts])
+  @@index([cameraId, ts])
+  @@index([trackId, cameraId, ts])
+  @@index([ts])
+  @@map("track_points")
 }
