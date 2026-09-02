@@ -4,6 +4,7 @@ import {
   registerForEvent as registerForEventAPI,
   deleteEvent as deleteEventAPI,
 } from '../services/event.service';
+import { persist } from '../utils/storage';
 
 export interface Camera {
   id: string;
@@ -117,6 +118,42 @@ interface EventProviderProps {
   children: ReactNode;
 }
 
+// ---------------------------------------------------------------------------
+// Caching events in localStorage
+//
+// Events are cached so a reload paints something before the API answers. Two
+// things about that went wrong at once.
+//
+// The cached copy included `mapFile`, which is a venue map stored as a base64
+// data URL - megabytes per event, in a store with about five of them for the
+// whole origin. A few events with maps filled it, and then every write threw
+// QuotaExceededError.
+//
+// And the write was unguarded, in the same function that records a newly
+// created event. So the throw happened *after* the server had already created
+// the event, and the page reported "Error creating event" for an event that
+// exists. A cache is an optimisation; the API is the source of truth. Failing
+// to cache must never look like failing to do the thing.
+// ---------------------------------------------------------------------------
+
+/** Fields too large to cache. They are re-read from the API on the next load. */
+const UNCACHED_FIELDS = ['mapFile', 'image'] as const;
+
+const forCache = (value: any): any => {
+  if (Array.isArray(value)) return value.map(forCache);
+  if (!value || typeof value !== 'object') return value;
+
+  const copy: any = { ...value };
+  for (const field of UNCACHED_FIELDS) delete copy[field];
+  return copy;
+};
+
+const writeCache = (key: string, value: unknown) => {
+  // The result is deliberately ignored. Failing to cache is not failing to do
+  // the thing the caller asked for, and `persist` leaves no stale entry behind.
+  persist(key, JSON.stringify(forCache(value)));
+};
+
 export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
   const [event, setEventState] = useState<Event | null>(() => {
     const storedEvent = localStorage.getItem('drishti_current_event');
@@ -173,7 +210,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
           registeredUsers: e.registeredUsers || []
         }));
         setEvents(apiEvents);
-        localStorage.setItem('drishti_all_events', JSON.stringify(apiEvents));
+        writeCache('drishti_all_events', apiEvents);
       }
     } catch (error) {
       console.error('Error fetching events:', error);
@@ -183,15 +220,15 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
 
   const setEvent = (newEvent: Event) => {
     setEventState(newEvent);
-    localStorage.setItem('drishti_current_event', JSON.stringify(newEvent));
+    writeCache('drishti_current_event', newEvent);
   };
 
   const addEvent = (newEvent: Event) => {
     const updatedEvents = [...events, newEvent];
     setEvents(updatedEvents);
     setEventState(newEvent);
-    localStorage.setItem('drishti_all_events', JSON.stringify(updatedEvents));
-    localStorage.setItem('drishti_current_event', JSON.stringify(newEvent));
+    writeCache('drishti_all_events', updatedEvents);
+    writeCache('drishti_current_event', newEvent);
   };
 
   const clearEvent = () => {
@@ -208,7 +245,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
 
     const updatedEvents = events.filter(e => e.id !== eventId);
     setEvents(updatedEvents);
-    localStorage.setItem('drishti_all_events', JSON.stringify(updatedEvents));
+    writeCache('drishti_all_events', updatedEvents);
 
     // If the deleted event was the current event, clear it
     if (event?.id === eventId) {
@@ -241,7 +278,7 @@ export const EventProvider: React.FC<EventProviderProps> = ({ children }) => {
       return e;
     });
     setEvents(updatedEvents);
-    localStorage.setItem('drishti_all_events', JSON.stringify(updatedEvents));
+    writeCache('drishti_all_events', updatedEvents);
 
     // Refresh events from server to ensure consistency
     await refreshEvents();

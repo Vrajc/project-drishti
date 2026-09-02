@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { persist } from '../utils/storage';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
 
@@ -75,8 +76,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setUser(userData);
       setIsAuthenticated(true);
-      localStorage.setItem('drishti_user', JSON.stringify(userData));
-      localStorage.setItem('drishti_token', token);
+      // The session depends on these surviving a reload, and the event cache
+      // had already been seen to fill the store - so a user could have been
+      // unable to sign in because of cached venue maps. `persist` evicts the
+      // caches to make room rather than letting the token write fail.
+      persist('drishti_user', JSON.stringify(userData));
+      if (!persist('drishti_token', token)) {
+        console.warn(
+          'The session token could not be stored; signing in again will be needed after a reload.'
+        );
+      }
     } catch (error: any) {
       console.error('Login error:', error);
       throw error;
@@ -104,8 +113,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       setUser(userData);
       setIsAuthenticated(true);
-      localStorage.setItem('drishti_user', JSON.stringify(userData));
-      localStorage.setItem('drishti_token', token);
+      // The session depends on these surviving a reload, and the event cache
+      // had already been seen to fill the store - so a user could have been
+      // unable to sign in because of cached venue maps. `persist` evicts the
+      // caches to make room rather than letting the token write fail.
+      persist('drishti_user', JSON.stringify(userData));
+      if (!persist('drishti_token', token)) {
+        console.warn(
+          'The session token could not be stored; signing in again will be needed after a reload.'
+        );
+      }
     } catch (error: any) {
       console.error('Registration error:', error);
       throw error;
