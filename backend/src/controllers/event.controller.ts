@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
 import prisma from '../lib/prisma.js';
 
 const eventInclude = {
@@ -44,6 +45,74 @@ const zoneRows = (zones: any[]) =>
       color: fromString ? undefined : zone?.color,
     };
   });
+
+/**
+ * Whether this caller may change this event.
+ *
+ * The route required the `organizer` role and stopped there, so any organizer
+ * could edit or delete any other organizer's event by its id - including the
+ * zones and response units of an event that was already running. The role says
+ * what kind of user this is; it never said whose event this is.
+ */
+async function assertMayEdit(
+  req: AuthRequest,
+  eventId: string
+): Promise<{ ok: true } | { ok: false; status: number; message: string }> {
+  const event = await prisma.event.findUnique({
+    where: { id: eventId },
+    select: { id: true, organizerId: true },
+  });
+
+  if (!event) return { ok: false, status: 404, message: 'Event not found' };
+  if (req.user?.role === 'admin') return { ok: true };
+  if (event.organizerId === req.user?.userId) return { ok: true };
+
+  return { ok: false, status: 403, message: 'This event belongs to another organizer' };
+}
+
+/**
+ * Brings a set of child rows in line with what was submitted, without deleting
+ * the ones that are staying.
+ *
+ * The previous update replaced them: `deleteMany: {}` followed by `create`.
+ * Renaming an event therefore destroyed every zone and every response unit it
+ * had and built new rows with new ids - and those deletes cascade, so the
+ * density readings recorded inside a zone and the record of where a unit had
+ * been dispatched went with them. An edit is not a reason to lose an event's
+ * operational history.
+ */
+function reconcile<T extends { id: string }>(
+  existing: T[],
+  submitted: Array<Record<string, any>>,
+  key: keyof T & string,
+  submittedKey: string,
+  build: (input: any) => Record<string, any>
+) {
+  const byKey = new Map(existing.map((row) => [String(row[key]), row]));
+  const seen = new Set<string>();
+
+  const create: Record<string, any>[] = [];
+  const update: Array<{ where: { id: string }; data: Record<string, any> }> = [];
+
+  submitted.forEach((input) => {
+    const data = build(input);
+    const identifier = String(input[submittedKey] ?? data[key] ?? '');
+    const match = identifier ? byKey.get(identifier) : undefined;
+
+    if (match) {
+      seen.add(match.id);
+      update.push({ where: { id: match.id }, data });
+    } else {
+      create.push(data);
+    }
+  });
+
+  const deleteMany = existing
+    .filter((row) => !seen.has(row.id))
+    .map((row) => ({ id: row.id }));
+
+  return { create, update, deleteMany };
+}
 
 // Helper to format event response to match frontend expectations
 function formatEvent(event: any) {
@@ -216,10 +285,26 @@ export const getEventById = async (req: Request, res: Response) => {
 };
 
 // Update event
-export const updateEvent = async (req: Request, res: Response) => {
+export const updateEvent = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+
+    const permission = await assertMayEdit(req, id);
+    if (!permission.ok) {
+      return res.status(permission.status).json({ success: false, message: permission.message });
+    }
+
     const { zones, cameras, dispatchUnits, mapFileBase64, ...updateData } = req.body;
+
+    // Read what the event has now, so the submitted list can be reconciled
+    // against it rather than replacing it.
+    const current = await prisma.event.findUnique({
+      where: { id },
+      select: {
+        zones: { select: { id: true, zoneId: true } },
+        dispatchUnits: { select: { id: true, unitId: true } },
+      },
+    });
 
     // If there's a new map file, store it directly
     if (mapFileBase64) {
@@ -233,25 +318,40 @@ export const updateEvent = async (req: Request, res: Response) => {
       where: { id },
       data: {
         ...updateData,
-        ...(zones ? { zones: { deleteMany: {}, create: zoneRows(zones) } } : {}),
+        ...(zones
+          ? {
+              zones: reconcile(
+                current?.zones ?? [],
+                zoneRows(zones),
+                'zoneId',
+                'zoneId',
+                (row) => row
+              ),
+            }
+          : {}),
         // `cameras` is ignored on update as well, and here it was destructive:
         // deleteMany deleted the registry rows themselves, taking their zones,
         // health history and stream configuration with them, because an event
         // editing its own layout looked like ownership. Assignment is a
         // foreign key on the camera, changed through the surveillance API.
-        ...(dispatchUnits ? {
-          dispatchUnits: {
-            deleteMany: {},
-            create: dispatchUnits.map((d: any, i: number) => ({
-              unitId: d.id || `unit-${i}`,
-              name: d.name || `Unit ${i + 1}`,
-              type: d.type || '',
-              contact: d.contact || '',
-              capacity: Number(d.capacity) || 0,
-              location: d.location || '',
-            })),
-          },
-        } : {}),
+        ...(dispatchUnits
+          ? {
+              dispatchUnits: reconcile(
+                current?.dispatchUnits ?? [],
+                dispatchUnits.map((d: any, i: number) => ({
+                  unitId: d.unitId || d.id || `unit-${i}`,
+                  name: d.name || `Unit ${i + 1}`,
+                  type: d.type || '',
+                  contact: d.contact || '',
+                  capacity: Number(d.capacity) || 0,
+                  location: d.location || '',
+                })),
+                'unitId',
+                'unitId',
+                (row) => row
+              ),
+            }
+          : {}),
       },
       include: eventInclude,
     });
@@ -277,9 +377,16 @@ export const updateEvent = async (req: Request, res: Response) => {
 };
 
 // Delete event
-export const deleteEvent = async (req: Request, res: Response) => {
+export const deleteEvent = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
+
+    // Deleting an event cascades to its zones, incidents, registrations and
+    // density history. Whose event it is matters even more here than on update.
+    const permission = await assertMayEdit(req, id);
+    if (!permission.ok) {
+      return res.status(permission.status).json({ success: false, message: permission.message });
+    }
 
     await prisma.event.delete({ where: { id } });
 

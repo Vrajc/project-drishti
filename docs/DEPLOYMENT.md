@@ -5,7 +5,7 @@ The live deployment is two hosted services and one managed database:
 | Piece | Where | Serves |
 | --- | --- | --- |
 | Frontend | Vercel — `project-drishti-seven.vercel.app` | the SPA, built from `frontend/` |
-| Backend | Render — `project-drishti-1.onrender.com` | `/api/*` and the Socket.IO endpoint |
+| Backend | Render — `project-drishti-805d.onrender.com` | `/api/*` and the Socket.IO endpoint |
 | Database | Prisma Postgres | everything |
 
 The camera stack in `docker-compose.yml` — MediaMTX, Redis, and the Python
@@ -42,6 +42,13 @@ Start Command    npm start
 `build:render` is `prisma generate && prisma migrate deploy && tsc`. Putting the
 migration in the build means a failed migration **aborts the deploy and leaves
 the old instance serving**, which is what you want.
+
+`prestart` also runs `prisma migrate deploy`, as a second line of defence — but
+only if the service actually starts with `npm start`. A Start Command of
+`node dist/server.js` skips npm's pre-scripts entirely, and that is how a deploy
+came up running code that selected an `endDate` column the database did not
+have: every event creation returned 500 until the migration was applied by hand.
+Set both, or the schema and the code drift apart on the next migration.
 
 `--include=dev` is not optional. `typescript` and the `@types/*` packages are
 devDependencies, and Render applies the service's environment variables to the
@@ -136,7 +143,7 @@ have honest behaviour when absent rather than a localhost fallback — see below
 
 **On Vercel:** Root Directory `frontend`, and `VITE_API_URL` pointing at the
 Render API. `frontend/.env.production` already carries
-`https://project-drishti-1.onrender.com/api`; a dashboard variable overrides it
+`https://project-drishti-805d.onrender.com/api`; a dashboard variable overrides it
 if you need a different backend. `VITE_SNAPSHOT_BASE_URL` stays blank, which
 makes the alerts console say a snapshot was recorded but is not reachable,
 instead of rendering a broken image.
