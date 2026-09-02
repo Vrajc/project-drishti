@@ -1600,3 +1600,141 @@ real video to a real plate row remains the same unverified gap as in Phases 3
 and 5. There was again no browser click-through.
 
 Gate still passes. `npm run build` exits 0; both `tsc --noEmit` exit 0.
+
+---
+
+## 14. Phase 7, and role-by-role verification in a browser
+
+The first session in which the Chrome extension was connected, so every earlier phase's "no
+click-through" caveat is now discharged for the UI. Docker's daemon was still down, so MediaMTX,
+Redis and the analytics service still did not run — those caveats stand.
+
+### Four defects that reading the code would not have found
+
+**1. Privilege escalation — the serious one.** `POST /api/auth/register` granted whatever role the
+body asked for. Anyone could register as `police` or `admin` and immediately reach the entire camera
+estate, the watchlist, alerts, dispatch and vehicle tracking. Found by registering a test admin
+during role verification and noticing it simply worked.
+
+Registration now accepts only `participant` and `organizer`, and **refuses** anything else with a
+403 rather than silently downgrading — someone who asked for an operator account needs to know they
+did not get one. `PATCH /api/users/:id/role` is the only path to a privileged account, is
+admin-only, and refuses to let an administrator strip their own role while signed in as it.
+
+```
+before   requested police -> granted role: police
+         requested admin  -> granted role: admin
+after    police 403 · admin 403 · organizer 201 · participant 201
+```
+
+**2. A hardcoded safety claim, shown to the people most likely to act on it.** The participant
+dashboard rendered `Safe` / `All systems clear` as two fixed strings in the markup, on every
+account, whatever was happening. **The mock gate could never have caught this** — no banned word
+appears in it, which is worth remembering about the gate's limits.
+
+It now reports open incidents across the events that person is actually registered for, and
+distinguishes four states: no registered events, checking, could not check, and a real count.
+Verified after registering for an event: *"No open incidents — Across 1 registered event"*.
+
+**3. Live monitoring asserted an empty venue.** Crowd level rendered `0%` when nothing had been
+measured. Zero is a claim that the venue is empty; "no reading yet" is a different statement. Both
+density tiles now hold null until a `CrowdDensity` row exists and render a dash. The admin
+dashboard's response-time tile also carried an `Optimal` subtitle whatever the value — including
+when there was no value — and now states what the number is instead.
+
+**4. Three navigation entries were unreachable.** Nine police entries overflowed a container whose
+scrollbar is deliberately hidden (`no-scrollbar`), so Camera Registry, Camera Map and Live Wall
+could not be seen or clicked. Measured rather than eyeballed: **668 px of items in a 566 px box**.
+
+The three surveillance pages cross-link each other, so the nav now carries one entry into that
+group; the user's name yields to the navigation below `xl`; and admin gained the police routes it
+could already reach by URL but could not navigate to. After: 668 in 668, `overflowing: false`.
+
+### A missing implementation, now built
+
+The spec's organizer journey is *create event → define zones → **assign registry cameras** → live
+monitoring*. There was no way to assign a registry camera to an event: Event Setup only let an
+organizer type camera details by hand.
+
+`PUT /api/surveillance/cameras/:id/assignment` and the `EventCameras` page close it. Authorisation
+is in the service rather than the middleware, because middleware cannot see which event is being
+targeted: an organizer may assign only to an event they own, and release only from an event they
+own. Both bypass attempts were tested and return 403 with the reason.
+
+### Snapshot fallbacks
+
+Two of the three pages that show snapshots had no `onError`, so an unreachable file rendered a
+broken image with alt text where a photograph should be. The third injected markup on every failed
+load and could stack duplicates. All three now use the same declarative fallback reading
+*"recorded, not served here"*.
+
+### Walked in the browser
+
+| Role | Path |
+|---|---|
+| Police | login → estate overview → alerts → **watchlist: added `GJ 01 AB 1234` through the form** → alert raised and **acknowledged** → vehicle trail → detection search → dispatch → registry → map → live wall |
+| Organizer | login → **created "Gandhinagar Navratri Mahotsav" with 3 zones** → **assigned 3 Mahatma Mandir cameras from the registry** → live monitoring → crowd flow → anomaly → emergency dispatch → pre-safety → AI summaries → post-event |
+| Participant | **registered through the form** → dashboard → explore events → **registered for the event** → dashboard reflects it |
+| Admin | dashboard → user statistics → **granted and revoked a role** |
+
+Every figure checked against the database. The admin dashboard now reads **14 users** where it once
+claimed 2,124, **0/60 cameras online** where it claimed a 94.5 safety score, and **Mean response —**
+where it claimed 98% system health.
+
+### Authorisation matrix, measured
+
+```
+route                              no token   organizer   police
+/surveillance/cameras                 401        200        200
+/surveillance/stats                   401        200        200
+/watchlist                            401        403        200
+/alerts/counts                        401        403        200
+/tracking/detections                  401        403        200
+/tracking/facets                      401        403        200
+/dispatch/units                       401        200        200
+/users/stats                          401        403        403   (admin only)
+```
+
+### Performance, in the browser
+
+```
+/api/alerts        963 ms      /api/alerts/counts   123 ms
+/api/watchlist     239 ms      /api/tracking/plate  1,120 ms
+/api/surveillance/cameras  1,393 ms
+vehicle trail, end to end, as the page measured it:  632 ms
+```
+
+A first page load took about nine seconds; that is Vite dev-mode module loading plus a cold
+connection, not the API.
+
+### One thing that is not a defect
+
+Synthesised coordinate clicks from the automation frequently failed to reach buttons on these pages.
+This was checked rather than assumed: `document.elementFromPoint` at the button's centre returns the
+button itself, and a dispatched click sequence at the same coordinates works. A real user's click
+lands. The failures are an artifact of the automation against this app's layered `fixed` overlays.
+
+### Phase 7 artefacts
+
+`docs/HLD.md`, `docs/SECURITY.md`, `docs/SCALE-80K.md`, `docs/COST-BENEFIT.md`,
+`docs/DEMO-SCRIPT.md`, `README-SENTINEL.md`.
+
+Two deliberate choices in them. `SCALE-80K` separates measured figures from assumed ones and states
+that the GPU sizing is an assumption no procurement should rest on. `COST-BENEFIT` states the
+**AGPL-3.0 obligation on Ultralytics YOLO** as a decision to make before procurement, not after —
+a submission that quoted a zero licence cost without it would be misleading.
+
+### State after this pass
+
+```
+npm run verify   PASS — 0 occurrences (9 allowlisted)
+npm run build    exit 0, both packages
+```
+
+Test data removed: the injected detections, track points and alerts did not come from a frame, so
+they were deleted. What was kept is what an operator genuinely created through the UI — the event,
+its zones, its three assigned cameras, and the watchlist entry.
+
+**Still unverified, and unchanged from earlier phases:** no detection in this system has ever
+originated from a real video frame. MediaMTX, Redis and the analytics service could not run here.
+That single gap is what a pilot has to close first.
