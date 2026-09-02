@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useEvent, normaliseZones } from '../contexts/EventContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Calendar, Clock, Users, MapPin, Upload, ArrowRight, Video, Truck, Phone, X } from 'lucide-react';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
-import { createEvent } from '../services/event.service';
+import { createEvent, updateEvent } from '../services/event.service';
 import { useToast } from '../components/Toast';
 
 /**
@@ -21,6 +21,12 @@ import { useToast } from '../components/Toast';
 interface ZoneDraft {
   name: string;
   maxCapacity: string;
+  /**
+   * The zone's existing handle, when this row came from a saved event. The
+   * server matches on it so an edit updates that zone instead of deleting it
+   * and building a new one - which would take its recorded density with it.
+   */
+  zoneId?: string;
 }
 
 interface DispatchUnit {
@@ -34,10 +40,14 @@ interface DispatchUnit {
 
 const EventSetup: React.FC = () => {
   const navigate = useNavigate();
-  const { addEvent } = useEvent();
+  // Present when editing a saved event, absent when creating one.
+  const { eventId } = useParams<{ eventId?: string }>();
+  const { addEvent, events, refreshEvents } = useEvent();
+  const isEdit = Boolean(eventId);
   const { user } = useAuth();
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     type: '',
@@ -71,6 +81,54 @@ const EventSetup: React.FC = () => {
     'ambulance', 'fire-truck', 'police', 'medical-team', 'security-team'
   ];
 
+  /**
+   * Fills the form from the saved event when editing.
+   *
+   * Zones carry their existing zoneId so the server updates them in place. Send
+   * a zone without one and it is treated as new, which would delete the old row
+   * and take the density recorded inside it along with it.
+   */
+  useEffect(() => {
+    if (!eventId) return;
+
+    const existing = events.find((candidate) => candidate.id === eventId);
+    if (!existing) {
+      // Events load asynchronously; this runs again when they arrive.
+      if (events.length > 0) setLoadError('That event could not be found.');
+      return;
+    }
+
+    setLoadError(null);
+    setFormData({
+      name: existing.name ?? '',
+      type: existing.type ?? '',
+      date: existing.date ?? '',
+      time: existing.time ?? '',
+      endDate: existing.endDate ?? '',
+      endTime: existing.endTime ?? '',
+      crowdSize: existing.crowdSize ?? 1000,
+      zones: (existing.zones ?? []).map((zone) => ({
+        name: zone.name,
+        maxCapacity: String(zone.maxCapacity ?? ''),
+        zoneId: zone.zoneId,
+      })),
+      dispatchUnits: (existing.dispatchUnits ?? []).map((unit: any) => ({
+        id: unit.unitId ?? unit.id,
+        unitId: unit.unitId,
+        name: unit.name,
+        type: unit.type,
+        contact: unit.contact,
+        capacity: unit.capacity,
+        location: unit.location,
+      })) as any,
+      location: existing.location ?? '',
+      description: existing.description ?? '',
+      // The saved map is a stored string, not a File. Leaving this null means
+      // "unchanged" - the server keeps what it has unless a new file is picked.
+      mapFile: null,
+    });
+  }, [eventId, events]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -94,16 +152,30 @@ const EventSetup: React.FC = () => {
       const eventData = {
         ...formData,
         // Capacity is collected as text and sent as a number: the API stores it
-        // as an Int and reports density against it.
+        // as an Int and reports density against it. zoneId travels with a zone
+        // that already exists so the server updates it rather than replacing it.
         zones: formData.zones.map((zone) => ({
           name: zone.name,
           maxCapacity: Number(zone.maxCapacity),
+          ...(zone.zoneId ? { zoneId: zone.zoneId } : {}),
         })),
         organizerId: user.id || '',
         organizerEmail: user.email,
         organizerName: user.name || '',
         image: 'https://images.pexels.com/photos/2747449/pexels-photo-2747449.jpeg'
       };
+
+      if (isEdit && eventId) {
+        const response = await updateEvent(eventId, eventData as any);
+        if (response.success) {
+          // Re-read rather than patch the cached copy: the server decides what a
+          // zone's id is and which rows survived the reconcile.
+          await refreshEvents();
+          toast.success('Event updated', `${eventData.name} has been saved.`);
+          navigate('/organizer-dashboard');
+        }
+        return;
+      }
 
       // Create event via API (saves to database)
       const response = await createEvent(eventData);
@@ -129,8 +201,11 @@ const EventSetup: React.FC = () => {
         navigate('/organizer-dashboard');
       }
     } catch (error: any) {
-      console.error('Error creating event:', error);
-      toast.error('The event was not created', error.message || 'Try again.');
+      console.error(isEdit ? 'Error updating event:' : 'Error creating event:', error);
+      toast.error(
+        isEdit ? 'The changes were not saved' : 'The event was not created',
+        error.message || 'Try again.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -200,12 +275,20 @@ const EventSetup: React.FC = () => {
             className="text-center mb-8 sm:mb-12"
           >
             <h1 className="text-heading text-2xl sm:text-3xl lg:text-4xl font-bold mb-3 sm:mb-4 text-ai-white">
-              Event Setup
+              {isEdit ? 'Edit Event' : 'Event Setup'}
             </h1>
             <p className="text-ai-gray-400 text-sm sm:text-base lg:text-lg">
-              Configure your event details to enable AI-powered safety features
+              {isEdit
+                ? 'Changes replace what is stored for this event. Zones you keep stay as they are, along with anything recorded against them.'
+                : 'Configure your event details to enable AI-powered safety features'}
             </p>
           </motion.div>
+
+          {loadError && (
+            <div className="glass-light rounded-2xl p-4 mb-6 border border-red-500/40">
+              <p className="text-sm text-ai-gray-300">{loadError}</p>
+            </div>
+          )}
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -587,7 +670,13 @@ const EventSetup: React.FC = () => {
                       : 'bg-ai-white text-ai-black hover:bg-ai-gray-300'
                   }`}
                 >
-                  {isSubmitting ? 'Creating Event...' : 'Start Safety Planning'} 
+                  {isSubmitting
+                    ? isEdit
+                      ? 'Saving…'
+                      : 'Creating Event...'
+                    : isEdit
+                      ? 'Save changes'
+                      : 'Start Safety Planning'}{' '}
                   <ArrowRight className="w-5 h-5" />
                 </motion.button>
               </div>

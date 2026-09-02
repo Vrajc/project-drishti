@@ -124,6 +124,16 @@ const AnimatedRoutes: React.FC = () => {
             </RequireRole>
           }
         />
+        {/* The same form, editing a saved event. The server checks that the
+            event belongs to whoever is asking. */}
+        <Route
+          path="/event-setup/:eventId"
+          element={
+            <RequireRole roles={['organizer', 'admin']}>
+              <PageWrapper><EventSetup /></PageWrapper>
+            </RequireRole>
+          }
+        />
         <Route
           path="/event-cameras"
           element={

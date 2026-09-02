@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useEvent } from '../contexts/EventContext';
-import { Calendar, Shield, Users, Eye, Brain, FileText, AlertTriangle, Truck, Camera } from 'lucide-react';
+import { Calendar, Shield, Users, Eye, Brain, FileText, AlertTriangle, Truck, Camera, Pencil } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
@@ -205,12 +205,21 @@ const OrganizerDashboard: React.FC = () => {
               <div className="relative z-10">
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-4 sm:mb-6">
                   <h3 className="text-lg sm:text-xl font-semibold text-ai-white tracking-wide">Current Event</h3>
-                  {getEventStatus(event) === 'live' && (
-                    <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-ai-white/10 text-ai-white rounded-full text-xs sm:text-sm font-medium flex items-center gap-2 border border-ai-gray-700 shrink-0">
-                      <div className="w-2.5 h-2.5 bg-ai-white rounded-full animate-pulse" />
-                      LIVE NOW
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {getEventStatus(event) === 'live' && (
+                      <span className="px-3 sm:px-4 py-1.5 sm:py-2 bg-ai-white/10 text-ai-white rounded-full text-xs sm:text-sm font-medium flex items-center gap-2 border border-ai-gray-700">
+                        <div className="w-2.5 h-2.5 bg-ai-white rounded-full animate-pulse" />
+                        LIVE NOW
+                      </span>
+                    )}
+                    <button
+                      onClick={() => navigate(`/event-setup/${event.id}`)}
+                      className="px-3 py-1.5 rounded-full border border-ai-gray-700 text-ai-gray-300 hover:text-ai-white hover:border-ai-gray-500 transition-colors text-xs sm:text-sm flex items-center gap-1.5"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                   {/* Event name and date are free-form and can be long, so they
