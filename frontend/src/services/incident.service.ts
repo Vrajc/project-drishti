@@ -30,6 +30,18 @@ export interface Incident extends IncidentData {
   _id: string;
   timestamp: Date;
   status: 'open' | 'investigating' | 'resolved';
+  /** Null when nobody has classified it — the report form does not ask. */
+  severity?: 'low' | 'medium' | 'high' | 'critical' | null;
+  /**
+   * Units currently committed to this incident. Empty means nobody has been
+   * sent — the server serves these with the incident, so a console never has to
+   * guess whether a unit is on its way.
+   */
+  activeAssignments?: Array<{
+    id: string;
+    status: string;
+    unit: { id: string; unitId: string; name: string; type: string };
+  }>;
   /** users.id of the reporter — an identifier, not a display value. */
   reporter: string;
   reporterEmail?: string;

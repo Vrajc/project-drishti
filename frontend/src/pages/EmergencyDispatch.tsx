@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { MapPin, Truck, Clock, Route, Phone, Navigation } from 'lucide-react';
 import { useEvent } from '../contexts/EventContext';
@@ -7,6 +7,7 @@ import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import Navbar from '../components/Navbar';
 import { incidentService } from '../services/incident.service';
+import { dispatchService } from '../services/dispatch.service';
 
 interface Incident {
   _id?: string;
@@ -18,6 +19,10 @@ interface Incident {
   reporter: string;
   reporterEmail?: string;
   status: 'open' | 'investigating' | 'resolved';
+  /** Null when nobody has classified it — the report form does not ask. */
+  severity?: 'low' | 'medium' | 'high' | 'critical' | null;
+  /** Units currently committed to this incident, as the server reports them. */
+  activeAssignments?: Array<{ id: string; status: string; unit: { name: string } }>;
   responseTime?: number;
   resolvedAt?: Date;
 }
@@ -26,7 +31,8 @@ interface Emergency {
   id: string;
   type: 'medical' | 'fire' | 'security' | 'evacuation';
   location: string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  /** The recorded severity, or null when nobody has classified the incident. */
+  priority: 'low' | 'medium' | 'high' | 'critical' | null;
   timestamp: Date;
   status: 'pending' | 'dispatched' | 'en-route' | 'on-scene' | 'resolved';
   assignedUnit?: string;
@@ -109,15 +115,18 @@ const EmergencyDispatch: React.FC = () => {
 
         const convertedEmergencies: Emergency[] = emergencyIncidents.map((inc: Incident) => {
           let emergencyType: 'medical' | 'security' = inc.type as 'medical' | 'security';
-          let priority: 'low' | 'medium' | 'high' | 'critical' = 'medium';
-          
-          // Determine priority based on incident description
-          const desc = inc.description.toLowerCase();
-          if (desc.includes('critical') || desc.includes('severe') || desc.includes('emergency')) {
-            priority = 'critical';
-          } else if (desc.includes('urgent') || desc.includes('serious')) {
-            priority = 'high';
-          }
+
+          // Priority is the severity somebody recorded, or null. It used to be
+          // guessed by searching the description for the words "critical",
+          // "severe" and "urgent" - so "not urgent" read as high priority, a
+          // report written in any other language read as medium, and the queue
+          // an operator worked through was ordered by vocabulary.
+          const priority = (inc.severity ?? null) as
+            | 'low'
+            | 'medium'
+            | 'high'
+            | 'critical'
+            | null;
 
           // Map incident status to emergency status
           let emergencyStatus: 'pending' | 'dispatched' | 'en-route' | 'on-scene' | 'resolved' = 'pending';
@@ -135,7 +144,11 @@ const EmergencyDispatch: React.FC = () => {
             location: inc.location,
             priority,
             timestamp: inc.timestamp,
-            status: emergencyStatus
+            status: emergencyStatus,
+            // Read from the incident's live assignments rather than remembered
+            // in component state, so it survives a reload and matches what the
+            // police console sees for the same incident.
+            assignedUnit: inc.activeAssignments?.[0]?.unit?.name,
           };
         });
 
@@ -166,45 +179,65 @@ const EmergencyDispatch: React.FC = () => {
     police: { label: 'Police', icon: '👮' }
   };
 
-  const priorityColors = {
+  // Keyed by the recorded severity. `unassessed` is its own entry rather than a
+  // fallback into 'medium': an incident nobody has classified must not be shown
+  // in the colour of one somebody classified as moderate.
+  const priorityColors: Record<string, string> = {
+    unassessed: 'border-ai-gray-700 bg-transparent',
     low: 'border-ai-gray-600 bg-ai-gray-600/10',
     medium: 'border-ai-gray-600 bg-ai-gray-600/10',
     high: 'border-ai-white bg-ai-white/10',
     critical: 'border-ai-white bg-ai-white/10'
   };
 
+  // Responders come from the event's DispatchUnit rows and nowhere else. There
+  // is no fallback: an event with no units configured shows an empty state,
+  // because inventing eight units at New York coordinates is worse than none.
+  //
+  // Read from the dispatch API rather than the event payload cached in context:
+  // that gave every unit the literal status 'available', so a unit already sent
+  // somewhere still showed as free to send. The status here is the row's own.
+  const loadUnits = useCallback(async () => {
+        if (!liveEvent?.id) return;
+        try {
+          const rows = await dispatchService.getUnits({ eventId: liveEvent.id });
+          setResponders(
+            rows.map((unit) => {
+              let responderType: 'ambulance' | 'fire_truck' | 'security' | 'police' = 'security';
+              const type = unit.type.toLowerCase();
+              if (type.includes('ambulance') || type.includes('medical')) responderType = 'ambulance';
+              else if (type.includes('fire')) responderType = 'fire_truck';
+              else if (type.includes('police')) responderType = 'police';
+
+              return {
+                id: unit.id,
+                unitId: unit.unitId,
+                name: unit.name,
+                type: responderType,
+                location: unit.location || '',
+                status:
+                  unit.status === 'available'
+                    ? ('available' as const)
+                    : unit.status === 'offline'
+                      ? ('offline' as const)
+                      : ('busy' as const),
+              };
+            })
+          );
+        } catch (error) {
+          // An unreadable unit list is empty and says nothing about availability.
+          setResponders([]);
+        }
+  }, [liveEvent?.id]);
+
   useEffect(() => {
     if (isActive) {
-      // Responders come from the event's DispatchUnit rows and nowhere else. There is no
-      // fallback: an event with no units configured shows an empty state, because inventing
-      // eight units at New York coordinates is worse than showing none.
-      const units: ResponderUnit[] = eventDispatchUnits.map(unit => {
-          // Map dispatch unit types to responder types
-          let responderType: 'ambulance' | 'fire_truck' | 'security' | 'police' = 'security';
-          if (unit.type.toLowerCase().includes('ambulance') || unit.type.toLowerCase().includes('medical')) {
-            responderType = 'ambulance';
-          } else if (unit.type.toLowerCase().includes('fire')) {
-            responderType = 'fire_truck';
-          } else if (unit.type.toLowerCase().includes('police')) {
-            responderType = 'police';
-          }
-          
-        return {
-          id: unit.id,
-          unitId: unit.id,
-          name: unit.name,
-          type: responderType,
-          location: unit.location || '',
-          status: 'available' as const
-        };
-      });
-
-      setResponders(units);
+      void loadUnits();
     } else {
-      // Clear responders when system is deactivated
+      // Clear responders when the system is deactivated
       setResponders([]);
     }
-  }, [isActive, eventDispatchUnits]);
+  }, [isActive, loadUnits]);
 
   // Dispatching a unit is a real operator action: it assigns a responder and moves the
   // incident to INVESTIGATING in Postgres. Everything that used to follow it was theatre —
@@ -216,31 +249,77 @@ const EmergencyDispatch: React.FC = () => {
   //
   // Nearest-unit selection and a real road-distance ETA need unit coordinates and a routing
   // service; until those exist this assigns the first available unit and shows no ETA.
-  const dispatchUnitToEmergency = async (emergency: Emergency) => {
-    const availableResponders = responders.filter(r => r.status === 'available');
-    if (availableResponders.length === 0) return;
-
-    const assigned = availableResponders[0];
-
+  /**
+   * Re-reads what the server owns after a dispatch: unit availability and the
+   * incident's status. Both change as a result of the call, and neither is this
+   * component's to decide.
+   */
+  const refreshDispatchState = useCallback(async () => {
+    await loadUnits();
+    if (!liveEvent?.id) return;
     try {
-      await incidentService.updateIncidentStatus(emergency.id, 'investigating');
-    } catch (error) {
-      console.error('Error updating incident status:', error);
-      setDispatchError('Could not record the dispatch. The incident was left unchanged.');
-      return;
+      const rows = await incidentService.getIncidentsByEvent(liveEvent.id);
+      setEmergencies((prev) =>
+        prev.map((emergency) => {
+          const row = rows.find((r: any) => (r._id ?? r.id) === emergency.id);
+          if (!row) return emergency;
+          return {
+            ...emergency,
+            assignedUnit: row.activeAssignments?.[0]?.unit?.name,
+            status:
+              row.status === 'resolved'
+                ? 'resolved'
+                : row.status === 'investigating'
+                  ? 'dispatched'
+                  : 'pending',
+          };
+        })
+      );
+    } catch {
+      // The poll below re-reads on its own; a failure here changes nothing.
     }
+  }, [liveEvent?.id, loadUnits]);
 
+  const dispatchUnitToEmergency = async (emergency: Emergency) => {
     setDispatchError(null);
 
-    setEmergencies(prev => prev.map(e =>
-      e.id === emergency.id
-        ? { ...e, status: 'dispatched', assignedUnit: assigned.name }
-        : e
-    ));
+    try {
+      // The server ranks the units that could serve this incident, nearest
+      // surveyed unit first, and says whether it could rank by distance at all.
+      // Picking here from a list that hardcoded every unit as available meant
+      // sending a unit already committed somewhere else.
+      const { units, rankedByDistance } = await dispatchService.getUnitsForIncident(emergency.id);
+      const candidate = units.find((unit) => unit.status === 'available');
 
-    setResponders(prev => prev.map(r =>
-      r.id === assigned.id ? { ...r, status: 'busy' } : r
-    ));
+      if (!candidate) {
+        setDispatchError('No unit is available to send. Add or free a unit first.');
+        return;
+      }
+
+      // This is the part that was missing: a DispatchAssignment row. Until now
+      // dispatching moved the incident to INVESTIGATING and then edited React
+      // state, so the assignment existed in one browser tab and nowhere else -
+      // a refresh lost it, and the police console, which reads the real
+      // assignments, never knew the unit had been sent.
+      await dispatchService.dispatchUnit(emergency.id, candidate.id);
+
+      setDispatchError(
+        rankedByDistance
+          ? null
+          : 'Sent, but units could not be ranked by distance: this incident or the units have no surveyed position.'
+      );
+
+      // Re-read rather than assume. The server owns unit status and incident
+      // status, and both change as a result of this call.
+      await refreshDispatchState();
+    } catch (error: any) {
+      console.error('Dispatch failed:', error);
+      setDispatchError(
+        error?.response?.data?.message ??
+          error?.message ??
+          'Could not record the dispatch. The incident was left unchanged.'
+      );
+    }
   };
 
   const toggleSystem = () => {
@@ -383,7 +462,7 @@ const EmergencyDispatch: React.FC = () => {
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className={`border rounded-xl p-4 ${priorityColors[emergency.priority]} ${
+                      className={`border rounded-xl p-4 ${priorityColors[emergency.priority ?? 'unassessed']} ${
                         emergency.status === 'pending' ? 'border-red-500/50' : ''
                       }`}
                       onClick={() => setSelectedEmergency(emergency)}
