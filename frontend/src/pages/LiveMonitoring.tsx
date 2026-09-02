@@ -47,7 +47,10 @@ const LiveMonitoring: React.FC = () => {
   });
   const [lostFoundImage, setLostFoundImage] = useState<File | null>(null);
   const [crowdDensity, setCrowdDensity] = useState<any[]>([]);
-  const [avgCrowdDensity, setAvgCrowdDensity] = useState<number>(0);
+  // Null until at least one CrowdDensity row has been read. A crowd level of 0%
+  // asserts the venue is empty, which is a different claim from "nothing has
+  // been measured here yet".
+  const [avgCrowdDensity, setAvgCrowdDensity] = useState<number | null>(null);
 
   // Helper function to check if event is live
   const isEventLive = (date: string, time: string): boolean => {
@@ -144,7 +147,7 @@ const LiveMonitoring: React.FC = () => {
           ? 'ALERT'
           : 'CAUTION',
     activeIncidents: openIncidentCount,
-    crowdLevel: avgCrowdDensity > 0 ? avgCrowdDensity.toString() : '0',
+    crowdLevel: avgCrowdDensity,
     emergencyUnits: liveEvent?.dispatchUnits?.length || 0,
     responseTime: meanResponseMinutes,
     cameras: liveEvent?.cameras?.length || 0,
@@ -227,6 +230,8 @@ const LiveMonitoring: React.FC = () => {
         if (data.length > 0) {
           const avg = data.reduce((sum, zone) => sum + zone.densityPercentage, 0) / data.length;
           setAvgCrowdDensity(Math.round(avg));
+        } else {
+          setAvgCrowdDensity(null);
         }
       } catch (error) {
         console.error('Error fetching crowd density:', error);
@@ -415,8 +420,12 @@ const LiveMonitoring: React.FC = () => {
                   
                   <div className="grid grid-cols-3 md:flex md:items-center gap-3 sm:gap-6 text-center shrink-0 border-t md:border-t-0 border-ai-gray-800 pt-4 md:pt-0">
                     <div>
-                      <div className="text-xl sm:text-2xl font-bold text-ai-white">{stats.crowdLevel}%</div>
-                      <div className="text-xs sm:text-sm text-ai-gray-400">Crowd Level</div>
+                      <div className="text-xl sm:text-2xl font-bold text-ai-white">
+                        {stats.crowdLevel === null ? '—' : `${stats.crowdLevel}%`}
+                      </div>
+                      <div className="text-xs sm:text-sm text-ai-gray-400">
+                        {stats.crowdLevel === null ? 'No crowd reading' : 'Crowd Level'}
+                      </div>
                     </div>
                     <div>
                       <div className="text-xl sm:text-2xl font-bold text-ai-white">{stats.emergencyUnits}</div>
@@ -524,8 +533,12 @@ const LiveMonitoring: React.FC = () => {
                       <h3 className="text-lg sm:text-xl font-semibold text-white">Live Crowd Density</h3>
                     </div>
                     <div className="flex items-baseline gap-2">
-                      <div className="text-2xl sm:text-3xl font-bold text-ai-white">{stats.crowdDensity}%</div>
-                      <span className="text-sm text-ai-gray-400">Average</span>
+                      <div className="text-2xl sm:text-3xl font-bold text-ai-white">
+                        {stats.crowdDensity === null ? '—' : `${stats.crowdDensity}%`}
+                      </div>
+                      <span className="text-sm text-ai-gray-400">
+                        {stats.crowdDensity === null ? 'Awaiting first reading' : 'Average'}
+                      </span>
                     </div>
                   </div>
                   

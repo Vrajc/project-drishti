@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -8,6 +8,7 @@ import Navbar from '../components/Navbar';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
 import ParticleHero from '../components/ParticleHero';
+import { incidentService } from '../services/incident.service';
 
 const ParticipantDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -16,6 +17,72 @@ const ParticipantDashboard: React.FC = () => {
 
   const registeredEvents = getUserRegisteredEvents(user?.id || '');
   const allEvents = getAllEvents();
+
+  // Open incidents across the events this participant is actually registered
+  // for. Null until the queries answer, so the tile never states a safety
+  // condition it has not checked.
+  const [openIncidentCount, setOpenIncidentCount] = useState<number | null>(null);
+  const [incidentsUnavailable, setIncidentsUnavailable] = useState(false);
+
+  const registeredIds = registeredEvents.map((event) => event.id).join(',');
+
+  useEffect(() => {
+    const ids = registeredIds ? registeredIds.split(',') : [];
+    if (ids.length === 0) {
+      setOpenIncidentCount(null);
+      setIncidentsUnavailable(false);
+      return;
+    }
+
+    let cancelled = false;
+    Promise.all(ids.map((id) => incidentService.getIncidentsByEvent(id)))
+      .then((lists) => {
+        if (cancelled) return;
+        const open = lists
+          .flat()
+          .filter((incident: any) => incident?.status && incident.status !== 'resolved').length;
+        setOpenIncidentCount(open);
+        setIncidentsUnavailable(false);
+      })
+      .catch(() => {
+        // The tile says it could not check, rather than defaulting to "Safe".
+        if (cancelled) return;
+        setOpenIncidentCount(null);
+        setIncidentsUnavailable(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [registeredIds]);
+
+  /**
+   * What the safety tile is allowed to say.
+   *
+   * It used to read "Safe / All systems clear" as two fixed strings baked into
+   * the markup, on every account, whatever was happening - a safety claim made
+   * to the people most likely to act on it, backed by nothing. It now reports the open
+   * incident count on the events this person is registered for, and says
+   * plainly when it has nothing to report on.
+   */
+  const safetyTile = (() => {
+    if (registeredEvents.length === 0) {
+      return { headline: '—', detail: 'Register for an event to see its status' };
+    }
+    if (incidentsUnavailable) {
+      return { headline: '—', detail: 'Could not check incident status' };
+    }
+    if (openIncidentCount === null) {
+      return { headline: '—', detail: 'Checking…' };
+    }
+    if (openIncidentCount === 0) {
+      return { headline: 'No open incidents', detail: `Across ${registeredEvents.length} registered event${registeredEvents.length === 1 ? '' : 's'}` };
+    }
+    return {
+      headline: `${openIncidentCount} open`,
+      detail: `Incident${openIncidentCount === 1 ? '' : 's'} on your registered event${registeredEvents.length === 1 ? '' : 's'}`,
+    };
+  })();
 
   const getEventStatus = (date: string, time: string): 'upcoming' | 'live' | 'past' => {
     const now = new Date();
@@ -155,8 +222,10 @@ const ParticipantDashboard: React.FC = () => {
                   <span className="text-sm font-medium text-ai-gray-400 tracking-wide">Safety Status</span>
                   <Activity className="w-5 h-5 text-ai-gray-400 group-hover:text-ai-white transition-colors" />
                 </div>
-                <div className="text-3xl font-bold text-ai-white mb-1">Safe</div>
-                <div className="text-sm text-ai-gray-500">All systems clear</div>
+                <div className="text-2xl sm:text-3xl font-bold text-ai-white mb-1 break-anywhere">
+                  {safetyTile.headline}
+                </div>
+                <div className="text-sm text-ai-gray-500">{safetyTile.detail}</div>
               </div>
             </motion.div>
           </motion.div>

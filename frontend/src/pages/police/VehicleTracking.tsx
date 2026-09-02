@@ -329,11 +329,22 @@ const VehicleTracking: React.FC = () => {
                                   <p className="camera-popup-title">#{position} {sighting.camera.cameraId}</p>
                                   <p className="camera-popup-sub">{sighting.camera.name}</p>
                                   {sighting.snapshotPath ? (
-                                    <img
-                                      src={`${SNAPSHOT_BASE}${sighting.snapshotPath}`}
-                                      alt={`Sighting at ${sighting.camera.name}`}
-                                      style={{ width: '100%', borderRadius: 6, marginBottom: 6 }}
-                                    />
+                                    <>
+                                      <img
+                                        src={`${SNAPSHOT_BASE}${sighting.snapshotPath}`}
+                                        alt=""
+                                        style={{ width: '100%', borderRadius: 6, marginBottom: 6 }}
+                                        onError={(event) => {
+                                          const target = event.currentTarget;
+                                          target.style.display = 'none';
+                                          const sibling = target.nextElementSibling as HTMLElement | null;
+                                          if (sibling) sibling.style.display = 'block';
+                                        }}
+                                      />
+                                      <p style={{ display: 'none', fontSize: 11, color: '#8C8C8C', marginBottom: 6 }}>
+                                        Snapshot recorded but not served to this browser
+                                      </p>
+                                    </>
                                   ) : (
                                     <p style={{ fontSize: 11, color: '#8C8C8C', marginBottom: 6 }}>
                                       No snapshot stored for this detection

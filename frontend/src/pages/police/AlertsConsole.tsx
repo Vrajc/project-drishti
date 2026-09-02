@@ -225,22 +225,29 @@ const AlertsConsole: React.FC = () => {
                       machine here rather than taking its word. */}
                   <div className="w-full lg:w-56 shrink-0">
                     {alert.detection.snapshotPath ? (
-                      <img
-                        src={`${SNAPSHOT_BASE}${alert.detection.snapshotPath}`}
-                        alt={`Detection on ${alert.camera.name}`}
-                        className="w-full aspect-video object-cover rounded-lg bg-ai-gray-900"
-                        onError={(event) => {
-                          // The row records a path; whether the file is reachable
-                          // from this browser is a separate question, and it says
-                          // so rather than showing a broken image icon.
-                          const target = event.currentTarget;
-                          target.style.display = 'none';
-                          target.insertAdjacentHTML(
-                            'afterend',
-                            '<div class="w-full aspect-video rounded-lg bg-ai-gray-900 border border-ai-gray-800 flex items-center justify-center text-[11px] text-ai-gray-500 px-3 text-center">Snapshot recorded but not reachable from this browser</div>'
-                          );
-                        }}
-                      />
+                      <>
+                        <img
+                          src={`${SNAPSHOT_BASE}${alert.detection.snapshotPath}`}
+                          alt=""
+                          className="w-full aspect-video object-cover rounded-lg bg-ai-gray-900"
+                          onError={(event) => {
+                            // The row records a path; whether the file is
+                            // reachable from this browser is a separate
+                            // question, and it says so rather than leaving a
+                            // broken image where a photograph should be.
+                            const target = event.currentTarget;
+                            target.style.display = 'none';
+                            const sibling = target.nextElementSibling as HTMLElement | null;
+                            if (sibling) sibling.style.display = 'flex';
+                          }}
+                        />
+                        <div
+                          style={{ display: 'none' }}
+                          className="w-full aspect-video rounded-lg bg-ai-gray-900 border border-ai-gray-800 items-center justify-center text-[11px] text-ai-gray-500 px-3 text-center"
+                        >
+                          Snapshot recorded but not reachable from this browser
+                        </div>
+                      </>
                     ) : (
                       <div className="w-full aspect-video rounded-lg bg-ai-gray-900 border border-ai-gray-800 flex items-center justify-center text-[11px] text-ai-gray-500 px-3 text-center">
                         No snapshot was stored for this detection

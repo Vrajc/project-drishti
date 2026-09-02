@@ -212,12 +212,26 @@ const EventSearch: React.FC = () => {
                     <tr key={detection.detectionId} className="border-b border-ai-gray-900 hover:bg-ai-gray-900/40 transition-colors">
                       <td className="px-4 py-3 align-top w-32">
                         {detection.snapshotPath ? (
-                          <img
-                            src={`${SNAPSHOT_BASE}${detection.snapshotPath}`}
-                            alt={`Detection on ${detection.camera.name}`}
-                            className="w-28 aspect-video object-cover rounded bg-ai-gray-900"
-                            loading="lazy"
-                          />
+                          <>
+                            <img
+                              src={`${SNAPSHOT_BASE}${detection.snapshotPath}`}
+                              alt=""
+                              className="w-28 aspect-video object-cover rounded bg-ai-gray-900"
+                              loading="lazy"
+                            onError={(event) => {
+                              const target = event.currentTarget;
+                              target.style.display = 'none';
+                              const sibling = target.nextElementSibling as HTMLElement | null;
+                              if (sibling) sibling.style.display = 'flex';
+                            }}
+                            />
+                            <div
+                              style={{ display: 'none' }}
+                              className="w-28 aspect-video rounded bg-ai-gray-900 border border-ai-gray-800 items-center justify-center text-[10px] text-ai-gray-600 text-center px-1"
+                            >
+                              recorded, not served here
+                            </div>
+                          </>
                         ) : (
                           <div className="w-28 aspect-video rounded bg-ai-gray-900 border border-ai-gray-800 flex items-center justify-center text-[10px] text-ai-gray-600 text-center px-1">
                             no snapshot stored

@@ -197,3 +197,49 @@ export const deleteUser = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ success: false, message: error.message || 'Failed to delete user' });
   }
 };
+
+/**
+ * Grants or revokes a privileged role. Administrators only.
+ *
+ * This is the legitimate path to an ADMIN or POLICE account, because public
+ * registration refuses to create one. It is deliberately separate from
+ * updateUser, which rejects role changes outright - a profile form and an
+ * authorisation change should not share an endpoint.
+ */
+export const setUserRole = async (req: AuthRequest, res: Response) => {
+  try {
+    const ROLES = ['PARTICIPANT', 'ORGANIZER', 'ADMIN', 'POLICE'] as const;
+    const wanted = String(req.body?.role ?? '').toUpperCase();
+
+    if (!ROLES.includes(wanted as (typeof ROLES)[number])) {
+      return res.status(400).json({
+        success: false,
+        message: `role must be one of ${ROLES.join(', ').toLowerCase()}`,
+      });
+    }
+
+    // An administrator demoting themselves could leave the deployment with no
+    // administrator at all, so it is refused rather than discovered later.
+    if (req.user?.userId === req.params.id && wanted !== 'ADMIN') {
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot remove your own administrator role while signed in as it',
+      });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { role: wanted as any },
+      select: publicFields,
+    });
+
+    console.log(`Role change: ${user.email} is now ${wanted} (by ${req.user?.userId})`);
+    res.status(200).json({ success: true, data: serialise(user) });
+  } catch (error: any) {
+    if (error?.code === 'P2025') {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+    console.error('Set user role error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to change the role' });
+  }
+};

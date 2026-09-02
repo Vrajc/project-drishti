@@ -498,7 +498,14 @@ const AdminDashboard: React.FC = () => {
                     ? `${(systemStats.avgResponseTime / 60).toFixed(1)}m`
                     : '-'}
                 </div>
-                <div className="text-xs sm:text-sm text-ai-gray-500">Optimal</div>
+                <div className="text-xs sm:text-sm text-ai-gray-500">
+                  {/* States what the number is, not a verdict on it. "Optimal"
+                      was asserted here whatever the value, including when there
+                      was no value at all. */}
+                  {systemStats.avgResponseTime > 0
+                    ? `mean over ${systemStats.resolvedIncidents} resolved`
+                    : 'no resolved incidents yet'}
+                </div>
               </div>
             </motion.div>
           </motion.div>

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useEvent } from '../contexts/EventContext';
-import { Calendar, Shield, Users, Eye, Brain, FileText, AlertTriangle, Truck } from 'lucide-react';
+import { Calendar, Shield, Users, Eye, Brain, FileText, AlertTriangle, Truck, Camera } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import MeshGradient from '../components/MeshGradient';
 import Spotlight from '../components/Spotlight';
@@ -91,6 +91,16 @@ const OrganizerDashboard: React.FC = () => {
   }, [hasLiveEvent, liveEvents.length]);
 
   const organizerFeatures = [
+    {
+      // The step between defining zones and monitoring them: an event does not
+      // own cameras, it borrows them from the estate registry.
+      icon: Camera,
+      title: 'Event Cameras',
+      description: 'Assign cameras from the estate registry to this event',
+      path: '/event-cameras',
+      enabled: Boolean(event),
+      badge: null
+    },
     {
       icon: Shield,
       title: 'AI Pre-Safety Planning',

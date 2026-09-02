@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
-  Camera as CameraIcon, Search, Plus, MapPin, Pencil, Trash2, X, Loader, AlertTriangle, Map as MapIcon,
+  Camera as CameraIcon, Search, Plus, MapPin, Pencil, Trash2, X, Loader, AlertTriangle, Map as MapIcon, Video,
 } from 'lucide-react';
 import MeshGradient from '../../components/MeshGradient';
 import Spotlight from '../../components/Spotlight';
@@ -281,6 +281,13 @@ const CameraRegistry: React.FC = () => {
               >
                 <MapIcon className="w-4 h-4" />
                 Map view
+              </button>
+              <button
+                onClick={() => navigate('/surveillance/live-wall')}
+                className="px-4 py-2.5 rounded-xl border border-ai-gray-700 text-ai-gray-200 hover:bg-ai-gray-900 transition-colors flex items-center gap-2 text-sm"
+              >
+                <Video className="w-4 h-4" />
+                Live wall
               </button>
               {canWrite && (
                 <button

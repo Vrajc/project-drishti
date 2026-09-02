@@ -6,6 +6,7 @@ import {
   getUserById,
   updateUser,
   deleteUser,
+  setUserRole,
 } from '../controllers/user.controller.js';
 
 const router = Router();
@@ -19,6 +20,10 @@ router.get('/', authenticate, authorize('admin'), getUsers);
 // see whose record is being asked for.
 router.get('/:id', authenticate, getUserById);
 router.put('/:id', authenticate, updateUser);
+
+// The only way to create an ADMIN or POLICE account: public registration
+// refuses those roles outright.
+router.patch('/:id/role', authenticate, authorize('admin'), setUserRole);
 
 router.delete('/:id', authenticate, authorize('admin'), deleteUser);
 

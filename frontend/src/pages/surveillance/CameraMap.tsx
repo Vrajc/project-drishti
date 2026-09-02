@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Map as MapIcon, List, Loader, AlertTriangle, MapPinOff } from 'lucide-react';
+import { Map as MapIcon, List, Loader, AlertTriangle, MapPinOff, Video } from 'lucide-react';
 import MeshGradient from '../../components/MeshGradient';
 import Spotlight from '../../components/Spotlight';
 import Navbar from '../../components/Navbar';
@@ -170,13 +170,22 @@ const CameraMap: React.FC = () => {
               </p>
             </div>
 
-            <button
-              onClick={() => navigate('/surveillance/cameras')}
-              className="px-4 py-2.5 rounded-xl border border-ai-gray-700 text-ai-gray-200 hover:bg-ai-gray-900 transition-colors flex items-center gap-2 text-sm shrink-0"
-            >
-              <List className="w-4 h-4" />
-              Registry list
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => navigate('/surveillance/cameras')}
+                className="px-4 py-2.5 rounded-xl border border-ai-gray-700 text-ai-gray-200 hover:bg-ai-gray-900 transition-colors flex items-center gap-2 text-sm"
+              >
+                <List className="w-4 h-4" />
+                Registry list
+              </button>
+              <button
+                onClick={() => navigate('/surveillance/live-wall')}
+                className="px-4 py-2.5 rounded-xl border border-ai-gray-700 text-ai-gray-200 hover:bg-ai-gray-900 transition-colors flex items-center gap-2 text-sm"
+              >
+                <Video className="w-4 h-4" />
+                Live wall
+              </button>
+            </div>
           </motion.div>
 
           <div className="glass-light rounded-2xl p-4 mb-4 flex flex-col lg:flex-row lg:items-center gap-3">

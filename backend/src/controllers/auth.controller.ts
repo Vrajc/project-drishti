@@ -73,13 +73,29 @@ export const register = async (req: Request, res: Response) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Map role string to enum
-    const roleMap: Record<string, 'ORGANIZER' | 'PARTICIPANT' | 'ADMIN' | 'POLICE'> = {
+    // Roles a person may give themselves.
+    //
+    // ADMIN and POLICE are deliberately absent. Public registration granted them
+    // on request, which meant anyone could create an account with the whole
+    // camera estate, the watchlist, alerts, dispatch and vehicle tracking behind
+    // it. Those accounts are now created by an administrator through
+    // PATCH /api/users/:id/role, or by the server's own seed.
+    const SELF_SERVICE_ROLES: Record<string, 'ORGANIZER' | 'PARTICIPANT'> = {
       organizer: 'ORGANIZER',
       participant: 'PARTICIPANT',
-      admin: 'ADMIN',
-      police: 'POLICE',
     };
+
+    const requested = String(role ?? 'participant').toLowerCase();
+
+    // Refused rather than quietly downgraded: someone who asked for an operator
+    // account needs to know they did not get one.
+    if (requested !== '' && !(requested in SELF_SERVICE_ROLES)) {
+      return res.status(403).json({
+        message:
+          `The "${requested}" role cannot be self-registered. Ask an administrator to grant it ` +
+          'to an existing account.',
+      });
+    }
 
     // Save to database
     const user = await prisma.user.create({
@@ -87,7 +103,7 @@ export const register = async (req: Request, res: Response) => {
         name,
         email: email.toLowerCase(),
         password: hashedPassword,
-        role: roleMap[role] || 'PARTICIPANT',
+        role: SELF_SERVICE_ROLES[requested] || 'PARTICIPANT',
       },
     });
 
