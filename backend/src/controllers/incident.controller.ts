@@ -72,7 +72,7 @@ function formatIncident(inc: any) {
     _id: inc.id,
     type: inc.type.toLowerCase(),
     status: inc.status.toLowerCase(),
-    severity: inc.severity.toLowerCase(),
+    severity: inc.severity ? inc.severity.toLowerCase() : null,
     source: inc.source.toLowerCase(),
     reporterName: reporterUser?.name ?? null,
     camera: camera ?? null,
@@ -163,7 +163,9 @@ export const createIncident = async (req: AuthRequest, res: Response) => {
         cameraId: camera?.id ?? null,
         siteId: camera?.siteId ?? null,
         type: typeMap[type] || 'GENERAL',
-        severity: severity ? severityMap[severity] : 'MEDIUM',
+        // Unset rather than MEDIUM: a filer who was not asked for a severity
+        // has not given one, and the console shows it as unassessed.
+        severity: severity ? severityMap[severity] : null,
         // A human is filing this. Only the rule engine may write ANOMALY, and
         // the database enforces that a MANUAL row names its reporter.
         source: 'MANUAL',
@@ -267,7 +269,13 @@ export const getEstateIncidents = async (req: AuthRequest, res: Response) => {
     const [incidents, total] = await Promise.all([
       prisma.incident.findMany({
         where,
-        orderBy: [{ status: 'asc' }, { severity: 'desc' }, { timestamp: 'desc' }],
+        // Postgres sorts NULLs first on DESC, which would put every
+        // unassessed incident at the top of the queue. They sort last.
+        orderBy: [
+          { status: 'asc' },
+          { severity: { sort: 'desc', nulls: 'last' } },
+          { timestamp: 'desc' },
+        ],
         include: incidentInclude,
         take: limit,
       }),

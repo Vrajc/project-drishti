@@ -78,7 +78,7 @@ export interface DispatchAssignment {
     eventId: string | null;
     cameraId: string | null;
     status: string;
-    severity: IncidentSeverity;
+    severity: IncidentSeverity | null;
     description: string;
   } | null;
 }
@@ -90,7 +90,8 @@ export interface EstateIncident {
   cameraId: string | null;
   siteId: string | null;
   type: 'medical' | 'security' | 'lost_found' | 'general';
-  severity: IncidentSeverity;
+  /** Null when nobody has classified it - the reporting form does not ask. */
+  severity: IncidentSeverity | null;
   source: 'manual' | 'anomaly';
   /** The rule that fired, for anomalies. Null for manual reports. */
   ruleKey: string | null;

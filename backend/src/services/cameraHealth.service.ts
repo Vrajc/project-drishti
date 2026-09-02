@@ -268,7 +268,7 @@ export async function runHealthSweep(cameraIds?: string[]): Promise<SweepSummary
           eventId: incident.eventId,
           cameraId: incident.cameraId,
           ruleKey: incident.ruleKey,
-          severity: incident.severity.toLowerCase(),
+          severity: incident.severity?.toLowerCase() ?? null,
           description: incident.description,
           source: 'anomaly',
           status: 'open',

@@ -12,7 +12,7 @@ import * as surveillance from '../../services/surveillance.service';
 import type { RegistryStats, EstateCrowd } from '../../services/surveillance.service';
 import { dispatchService, type DispatchStats, type EstateIncident } from '../../services/dispatch.service';
 import { STATUS_PRESENTATION } from '../surveillance/cameraStatus';
-import { SEVERITY, RULE_EXPLANATION, relativeTime } from './incidentPresentation';
+import { severityOf, RULE_EXPLANATION, relativeTime } from './incidentPresentation';
 
 // ============================================================================
 // The estate overview — what police can see across the whole jurisdiction.
@@ -257,10 +257,10 @@ const EstateOverview: React.FC = () => {
                           <div className="flex items-start justify-between gap-2 mb-1">
                             <span
                               className={`px-2 py-0.5 rounded-md text-[11px] font-medium ${
-                                SEVERITY[incident.severity].chip
+                                severityOf(incident.severity).chip
                               }`}
                             >
-                              {SEVERITY[incident.severity].label}
+                              {severityOf(incident.severity).label}
                             </span>
                             <span
                               className="text-[11px] text-ai-gray-500 shrink-0"

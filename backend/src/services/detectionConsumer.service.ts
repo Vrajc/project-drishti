@@ -330,7 +330,7 @@ async function writeFrame(frame: Frame): Promise<number> {
         eventId: incident.eventId,
         cameraId: incident.cameraId,
         ruleKey: incident.ruleKey,
-        severity: incident.severity.toLowerCase(),
+        severity: incident.severity?.toLowerCase() ?? null,
         description: incident.description,
         source: 'anomaly',
         status: 'open',

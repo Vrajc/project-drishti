@@ -13,7 +13,7 @@ import {
 } from '../../services/dispatch.service';
 import { getSocket, onRealtime, type RealtimeStatus } from '../../lib/socket';
 import {
-  SEVERITY, STATUS_LABEL, DISPATCH_STATUS_LABEL, RULE_EXPLANATION,
+  severityOf, STATUS_LABEL, DISPATCH_STATUS_LABEL, RULE_EXPLANATION,
   sourceLabel, relativeTime, queueOrder,
 } from './incidentPresentation';
 
@@ -473,7 +473,7 @@ const IncidentCard: React.FC<{
   selected: boolean;
   onSelect: () => void;
 }> = ({ incident, selected, onSelect }) => {
-  const severity = SEVERITY[incident.severity];
+  const severity = severityOf(incident.severity);
 
   return (
     <button
@@ -577,7 +577,7 @@ const DispatchPanel: React.FC<{
   incident, units, rankedByDistance, assignments, loading, busyAction, error,
   onClose, onDispatch, onAdvance, onResolve,
 }) => {
-  const severity = SEVERITY[incident.severity];
+  const severity = severityOf(incident.severity);
   const live = assignments.filter((a) => !['cleared', 'cancelled'].includes(a.status));
 
   return (

@@ -338,7 +338,11 @@ model Incident {
   siteId   String?
 
   type        IncidentType
-  severity    IncidentSeverity @default(MEDIUM)
+  // Optional because most incidents are never assessed. The reporting UI does
+  // not collect a severity, and the default that used to stand in for one -
+  // MEDIUM - was read downstream as an assessment nobody made. Null means
+  // exactly that: no one has classified this yet.
+  severity    IncidentSeverity?
   source      IncidentSource   @default(MANUAL)
   description String
   location    String

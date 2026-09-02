@@ -45,6 +45,26 @@ export const SEVERITY: Record<IncidentSeverity, SeverityPresentation> = {
   },
 };
 
+/**
+ * How an incident nobody has classified is shown.
+ *
+ * Most manual reports are this: the form does not ask a filer for a severity,
+ * and the column used to default to MEDIUM, so the queue ranked unassessed
+ * incidents above genuinely low ones and the badge claimed a judgement that had
+ * not been made. It carries no weight in the ordering and reads as what it is.
+ */
+export const UNASSESSED: SeverityPresentation = {
+  label: 'Unassessed',
+  weight: 0,
+  chip: 'bg-transparent text-ai-gray-500 border border-dashed border-ai-gray-700',
+  border: 'border-ai-gray-800',
+};
+
+/** Presentation for a severity that may not have been set. */
+export const severityOf = (
+  severity: IncidentSeverity | null | undefined
+): SeverityPresentation => (severity ? SEVERITY[severity] : UNASSESSED);
+
 export const STATUS_LABEL: Record<string, string> = {
   open: 'Open',
   investigating: 'Investigating',
@@ -96,7 +116,7 @@ export function queueOrder(a: EstateIncident, b: EstateIncident): number {
   const openness = Number(a.status === 'resolved') - Number(b.status === 'resolved');
   if (openness !== 0) return openness;
 
-  const severity = SEVERITY[b.severity].weight - SEVERITY[a.severity].weight;
+  const severity = severityOf(b.severity).weight - severityOf(a.severity).weight;
   if (severity !== 0) return severity;
 
   return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();

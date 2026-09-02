@@ -119,7 +119,10 @@ async function raise(input: RaiseInput): Promise<RaisedIncident> {
     select: { id: true, cameraId: true, eventId: true, severity: true, description: true },
   });
 
-  return { ...incident, ruleKey: input.ruleKey };
+  // severity is optional on the model - most incidents are never classified -
+  // but a rule-raised one always carries the classification the rule made, so
+  // it is restated here rather than widened to null for every caller.
+  return { ...incident, severity: input.severity, ruleKey: input.ruleKey };
 }
 
 // ---------------------------------------------------------------------------

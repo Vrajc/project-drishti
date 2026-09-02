@@ -62,7 +62,7 @@ export function formatAssignment(assignment: any) {
           ...incident,
           _id: incident.id,
           status: incident.status.toLowerCase(),
-          severity: incident.severity.toLowerCase(),
+          severity: incident.severity?.toLowerCase() ?? null,
         }
       : null,
     // Derived from two real timestamps, or null. Never estimated.
