@@ -1338,3 +1338,137 @@ rule-engine hand-off are therefore exercised only by construction and type, not
 against a live stream. The full organizer walk-through in the phase's
 done-condition — create event, define zones, assign cameras, watch a number
 change — is unrun for the same reason. There was again no browser click-through.
+
+---
+
+## 12. Phase 5 — watchlist, plate matching, alerts
+
+Migration `add_watchlist_and_alerts`: four tables (`watchlist_entries`,
+`detections`, `alerts`, `track_points`), three enums, and back-relations on
+`Camera` and `User`. Purely additive — no DROP, no data touched; 60 cameras, 13
+users and 3 events all intact afterwards.
+
+### Match scores are computed, and it is checked
+
+`utils/plateMatch.ts` is deliberately separate from the engine so it can be
+reasoned about without Redis or a database in the way. Everything in it is a
+pure function.
+
+Normalisation uppercases, strips everything that is not alphanumeric, and folds
+exactly four OCR confusions: `O`, `Q` → `0` and `I`, `L` → `1`. **Deliberately
+narrow.** Folding `S/5`, `B/8` or `Z/2` as well would raise the hit rate and
+start matching genuinely different plates — and on a watchlist a false positive
+sends officers to the wrong vehicle.
+
+The score is `1 - distance / length`, computed from a bounded Levenshtein
+distance. An exact match is 1. One substitution on a ten-character plate is
+0.9; on a six-character plate 0.83 — which is correct, because one wrong
+character matters more on a shorter plate. **A fuzzy match can never reach an
+exact match's score**, so an operator can see at a glance that the system is not
+certain. Plates shorter than four characters are refused outright: a
+two-character fragment sits within one edit of a great many real plates.
+
+Verified by 27 assertions, all passing — normalisation, distance (substitution,
+insertion, deletion, early-out on length gap), and the matcher including the
+four-character floor, the fuzzy-disabled path, and that every fuzzy score is
+strictly below the exact one.
+
+### The engine
+
+`matchEngine.service.ts` reads the same stream as the crowd consumer under its
+own consumer group (`drishti-match`), so the two have independent delivery and
+neither can stall the other. Per detection it does three things: persist a
+sampled detection, record a track point, and compare any plate against the
+active watchlist.
+
+**The detections table is a sample, and says so.** At eight sampled frames a
+second across fifty cameras, storing everything would be tens of millions of
+rows a day. What is kept: one row per camera-track per
+`DETECTION_PERSIST_INTERVAL_SECONDS`, plus **every** detection carrying a plate,
+because that is the evidence behind an alert. The rule is written on the model
+and repeated wherever the table is served, so "all detections" is never read as
+a complete record.
+
+**TrackPoint stores the camera's position, not the object's.** This system
+cannot place a vehicle within a field of view. A route drawn from these points is
+a sequence of cameras that saw the vehicle, and the model comment says so, so
+Phase 6 cannot quietly present it as a GPS trail. A camera with no survey gets no
+track point rather than one at 0,0.
+
+Deduplication: the same watchlist entry on the same camera inside
+`ALERT_DEDUPE_SECONDS` (30) is one sighting. Without it a car at a red light
+would alert on every sampled frame.
+
+### Verified end to end against the real database
+
+Driven through `processDetectionEvent` — the same function the stream loop calls,
+exported so a replay uses the same path rather than a parallel one that could
+drift:
+
+```
+1  plate passes with an empty watchlist    -> 0 alerts, detection still persisted
+2  GJ01AB1234 added                        -> stored as "GJ 01 AB 1234" / GJ01AB1234
+3  same plate passes                       -> ALERT PLATE_EXACT score 1, status NEW
+                                              camera GNR-001, real snapshot path, real bbox
+4  again 5s later on the same camera       -> still 1 alert, 1 suppressed as duplicate
+5  again 45s later                         -> 2 alerts
+6  OCR misread "GJO1AB1234" (letter O)     -> PLATE_EXACT score 1 (normalisation folded it)
+7  genuinely different "GJ01AB1235"        -> PLATE_FUZZY score 0.9
+8  unrelated "MH12CD9999"                  -> nothing raised
+9  entry deactivated                       -> nothing raised
+10 track point written                     -> at the camera's surveyed 23.2266, 72.6489
+```
+
+Through the HTTP API: organizer 403 and no-token 401 on `/watchlist`; issuer
+taken from the token; four validation refusals each naming the reason; CSV
+import of four rows returning `imported: 2, rejected: 2` **with the offending
+line numbers and reasons**; the alert workflow moving NEW → ACKNOWLEDGED →
+DISPATCHED with the first handler's name preserved on the second transition; an
+invalid status rejected; and deleting a watchlist entry that has raised alerts
+refused with an explanation, because deleting cascades to the alerts and loses
+the record.
+
+All test rows removed afterwards — watchlist, alerts, detections and track
+points are back to 0.
+
+### An empty console explains itself
+
+"No alerts" means one of five very different things, and `/api/alerts/counts`
+returns what tells them apart: whether the engine is running, whether it can
+reach Redis, how many watchlist entries are active, and **how many detections
+have actually carried a plate**. Measured here:
+
+```
+total 0 · unhandled 0 · watchlistActive 3 · platesReadable 0
+engine running true · connected false · lastError "Connection is closed."
+```
+
+The console renders that as *"The match engine cannot reach Redis, so no
+detections are arriving"* rather than an empty list that reads as a quiet night.
+When Redis is up but no plate reader is configured it says that instead. This is
+the difference between a system that is idle and one that is working — and a
+judge will ask.
+
+The navbar badge shows unhandled alerts, and is **absent** rather than showing 0
+until the count is actually known.
+
+### Deliberately not built
+
+Face matching. `WatchlistEntry.embedding` exists and is null on every row;
+nothing reads it. The person form says plainly that a person entry is a record
+only and will not raise alerts, rather than accepting a photo and silently never
+matching it. InsightFace and pgvector are listed as the last, bonus item and are
+not in scope here.
+
+### Not verified
+
+The phase's acceptance test — *adding `GJ01AB1234` raises an alert within three
+seconds of that plate passing a running camera* — is **unverified end to end**.
+Every link is proven except the two that need infrastructure this machine cannot
+run: Redis transport, and a plate actually being read. The ai-service's plate
+reader is off unless `PLATE_MODEL_PATH` is set, so no real plate text has ever
+entered the system. What was proven is that given a detection carrying
+`GJ01AB1234`, the engine raises the correct alert against the correct camera
+with the correct snapshot, in-process, against the real database.
+
+Gate still passes. `npm run build` exits 0; both `tsc --noEmit` exit 0.
