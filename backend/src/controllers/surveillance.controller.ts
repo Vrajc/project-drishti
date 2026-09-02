@@ -249,3 +249,62 @@ export const setCameraAssignment = async (req: AuthRequest, res: Response) => {
     fail(res, error, 'Failed to change the camera assignment');
   }
 };
+
+// ---------------------------------------------------------------------------
+// Counting zones on a camera
+// ---------------------------------------------------------------------------
+
+export const getCameraZones = async (req: Request, res: Response) => {
+  try {
+    const result = await surveillance.listCameraZones(req.params.id);
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'Camera not found' });
+    }
+    res.status(200).json({ success: true, ...result });
+  } catch (error: any) {
+    fail(res, error, 'Failed to read the camera zones');
+  }
+};
+
+export const createCameraZone = async (req: Request, res: Response) => {
+  try {
+    const zone = await surveillance.createCameraZone(req.params.id, req.body ?? {});
+    if (!zone) {
+      return res.status(404).json({ success: false, message: 'Camera not found' });
+    }
+    res.status(201).json({ success: true, message: 'Counting zone created', data: zone });
+  } catch (error: any) {
+    fail(res, error, 'Failed to create the counting zone');
+  }
+};
+
+export const updateCameraZone = async (req: Request, res: Response) => {
+  try {
+    const zone = await surveillance.updateCameraZone(req.params.zoneId, req.body ?? {});
+    if (!zone) {
+      return res.status(404).json({ success: false, message: 'Zone not found' });
+    }
+    res.status(200).json({ success: true, message: 'Counting zone updated', data: zone });
+  } catch (error: any) {
+    fail(res, error, 'Failed to update the counting zone');
+  }
+};
+
+export const deleteCameraZone = async (req: Request, res: Response) => {
+  try {
+    const result = await surveillance.deleteCameraZone(req.params.zoneId);
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'Zone not found' });
+    }
+    res.status(200).json({
+      success: true,
+      message:
+        result.readingsDeleted > 0
+          ? `Zone deleted along with ${result.readingsDeleted} recorded reading(s)`
+          : 'Zone deleted',
+      data: result,
+    });
+  } catch (error: any) {
+    fail(res, error, 'Failed to delete the counting zone');
+  }
+};

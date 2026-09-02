@@ -412,3 +412,92 @@ export const setCameraAssignment = async (cameraId: string, eventId: string | nu
     rethrow(error, 'Changing the camera assignment');
   }
 };
+
+// ---------------------------------------------------------------------------
+// Counting zones on a camera
+//
+// Vertices are percentages of the camera frame, 0-100 on each axis. The
+// detector scales them into whatever resolution it actually captured, so a zone
+// drawn once stays correct if the stream is re-encoded - and nothing has to
+// remember what canvas the operator drew on.
+// ---------------------------------------------------------------------------
+
+export interface ZoneVertex {
+  x: number;
+  y: number;
+}
+
+export interface CameraZone {
+  id: string;
+  zoneId: string;
+  name: string;
+  coordinates: ZoneVertex[];
+  maxCapacity: number;
+  color: string | null;
+  createdAt: string;
+}
+
+export interface CameraZonesResponse {
+  camera: { id: string; cameraId: string; name: string };
+  zones: CameraZone[];
+  /** The canvas the vertices above are expressed against: always 100 x 100. */
+  zoneReferenceSize: { width: number; height: number };
+}
+
+export interface CameraZonePayload {
+  name: string;
+  maxCapacity: number;
+  coordinates: ZoneVertex[];
+  color?: string | null;
+}
+
+export const getCameraZones = async (cameraId: string) => {
+  try {
+    const response = await axios.get<{ success: boolean } & CameraZonesResponse>(
+      `${API_URL}/cameras/${cameraId}/zones`,
+      { headers: authHeaders() }
+    );
+    return response.data;
+  } catch (error: any) {
+    rethrow(error, 'Fetching camera zones');
+  }
+};
+
+export const createCameraZone = async (cameraId: string, payload: CameraZonePayload) => {
+  try {
+    const response = await axios.post<{ success: boolean; data: CameraZone }>(
+      `${API_URL}/cameras/${cameraId}/zones`,
+      payload,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Creating the counting zone');
+  }
+};
+
+export const updateCameraZone = async (zoneId: string, payload: Partial<CameraZonePayload>) => {
+  try {
+    const response = await axios.put<{ success: boolean; data: CameraZone }>(
+      `${API_URL}/zones/${zoneId}`,
+      payload,
+      { headers: authHeaders() }
+    );
+    return response.data.data;
+  } catch (error: any) {
+    rethrow(error, 'Updating the counting zone');
+  }
+};
+
+export const deleteCameraZone = async (zoneId: string) => {
+  try {
+    const response = await axios.delete<{
+      success: boolean;
+      message: string;
+      data: { readingsDeleted: number };
+    }>(`${API_URL}/zones/${zoneId}`, { headers: authHeaders() });
+    return response.data;
+  } catch (error: any) {
+    rethrow(error, 'Deleting the counting zone');
+  }
+};

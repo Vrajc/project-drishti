@@ -10,6 +10,10 @@ import {
   getSites,
   getStats,
   getCameraStreamEndpoints,
+  getCameraZones,
+  createCameraZone,
+  updateCameraZone,
+  deleteCameraZone,
   runHealthCheck,
   runCameraHealthCheck,
   getHealthStatus,
@@ -34,6 +38,13 @@ router.delete('/cameras/:id', authenticate, canWrite, deleteCamera);
 
 // Playback. Reading is enough - watching a feed does not change the estate.
 router.get('/cameras/:id/stream', authenticate, canRead, getCameraStreamEndpoints);
+
+// Counting zones. Without these a Zone with a cameraId could only be created by
+// hand against the database, so nothing in the product could ever be counted.
+router.get('/cameras/:id/zones', authenticate, canRead, getCameraZones);
+router.post('/cameras/:id/zones', authenticate, canWrite, createCameraZone);
+router.put('/zones/:zoneId', authenticate, canWrite, updateCameraZone);
+router.delete('/zones/:zoneId', authenticate, canWrite, deleteCameraZone);
 
 // Probing is a write in the sense that it records CameraHealth rows and moves
 // Camera.status, so it is held to the same roles as editing the registry.

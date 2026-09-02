@@ -807,3 +807,187 @@ export async function setCameraAssignment(
 
   return formatCamera(updated);
 }
+
+// ---------------------------------------------------------------------------
+// Counting zones on a camera
+//
+// A CrowdDensity row is a count of people inside a zone, and until this existed
+// there was no way to create one: Zone rows with a cameraId could only be
+// written by hand against the database. Every crowd figure in the product -
+// the estate view, an event's crowd flow, the ZONE_CAPACITY_BREACH rule -
+// depends on a zone existing, so the whole counting half of the platform was
+// unreachable through its own interface.
+//
+// GEOMETRY
+// --------
+// Vertices are percentages of the camera frame, 0-100 on each axis, not pixels.
+// The detector scales zone geometry from a stated reference canvas into the
+// frame it actually captured (see ai-service/zones.py, which refuses to guess
+// one); percentages make that reference a constant - 100 x 100 - so a zone
+// stays correct when a camera is re-encoded at a different resolution, and no
+// part of the system has to remember what canvas an operator drew on.
+// ---------------------------------------------------------------------------
+
+/** The reference canvas zone vertices are expressed against. */
+export const ZONE_REFERENCE_SIZE = { width: 100, height: 100 };
+
+export interface ZoneVertex {
+  x: number;
+  y: number;
+}
+
+export interface CameraZoneInput {
+  name?: unknown;
+  maxCapacity?: unknown;
+  coordinates?: unknown;
+  color?: unknown;
+}
+
+function parseVertices(raw: unknown): ZoneVertex[] {
+  if (!Array.isArray(raw)) {
+    throw new ValidationError('coordinates must be an array of {x, y} vertices');
+  }
+
+  const vertices = raw.map((vertex: any, i: number) => {
+    const x = Number(vertex?.x);
+    const y = Number(vertex?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      throw new ValidationError(`Vertex ${i + 1} needs numeric x and y`);
+    }
+    // Out of range means the caller is sending pixels, and a polygon in the
+    // wrong units counts the wrong people rather than failing visibly.
+    if (x < 0 || x > 100 || y < 0 || y > 100) {
+      throw new ValidationError(
+        `Vertex ${i + 1} is outside the frame: x and y are percentages of it, 0 to 100`
+      );
+    }
+    return { x, y };
+  });
+
+  if (vertices.length < 3) {
+    throw new ValidationError('A zone needs at least three vertices to enclose an area');
+  }
+
+  return vertices;
+}
+
+function parseCapacity(raw: unknown): number {
+  const capacity = Number(raw);
+  if (!Number.isFinite(capacity) || capacity <= 0) {
+    throw new ValidationError(
+      'maxCapacity must be above zero: density is reported as a percentage of it'
+    );
+  }
+  return Math.round(capacity);
+}
+
+/**
+ * The zones defined on one camera, with the reference canvas they are drawn
+ * against - which is the exact payload the detector's worker needs.
+ */
+export async function listCameraZones(cameraId: string) {
+  const camera = await prisma.camera.findUnique({
+    where: { id: cameraId },
+    select: { id: true, cameraId: true, name: true },
+  });
+  if (!camera) return null;
+
+  const zones = await prisma.zone.findMany({
+    where: { cameraId },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      zoneId: true,
+      name: true,
+      coordinates: true,
+      maxCapacity: true,
+      color: true,
+      createdAt: true,
+    },
+  });
+
+  return { camera, zones, zoneReferenceSize: ZONE_REFERENCE_SIZE };
+}
+
+export async function createCameraZone(cameraId: string, input: CameraZoneInput) {
+  const camera = await prisma.camera.findUnique({
+    where: { id: cameraId },
+    select: { id: true },
+  });
+  if (!camera) return null;
+
+  const name = String(input.name ?? '').trim();
+  if (!name) throw new ValidationError('A zone needs a name');
+
+  const coordinates = parseVertices(input.coordinates);
+  const maxCapacity = parseCapacity(input.maxCapacity);
+
+  // zoneId is the human-facing handle. It is unique per camera through the
+  // partial index added with the registry, so it is derived from the name and
+  // disambiguated rather than left to collide.
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'zone';
+  const taken = new Set(
+    (await prisma.zone.findMany({ where: { cameraId }, select: { zoneId: true } })).map(
+      (z) => z.zoneId
+    )
+  );
+  let zoneId = base;
+  for (let suffix = 2; taken.has(zoneId); suffix += 1) zoneId = `${base}-${suffix}`;
+
+  return prisma.zone.create({
+    data: {
+      cameraId,
+      // Never both: zones_scope_check enforces that a zone belongs to a camera
+      // or to an event, and a counting zone is drawn on a camera.
+      eventId: null,
+      zoneId,
+      name,
+      coordinates: coordinates as any,
+      maxCapacity,
+      color: input.color ? String(input.color) : null,
+    },
+  });
+}
+
+export async function updateCameraZone(zoneId: string, input: CameraZoneInput) {
+  const existing = await prisma.zone.findUnique({
+    where: { id: zoneId },
+    select: { id: true, cameraId: true },
+  });
+  if (!existing) return null;
+  if (!existing.cameraId) {
+    throw new ValidationError('That zone belongs to an event, not a camera');
+  }
+
+  const data: any = {};
+  if (input.name !== undefined) {
+    const name = String(input.name).trim();
+    if (!name) throw new ValidationError('A zone needs a name');
+    data.name = name;
+  }
+  if (input.coordinates !== undefined) data.coordinates = parseVertices(input.coordinates) as any;
+  if (input.maxCapacity !== undefined) data.maxCapacity = parseCapacity(input.maxCapacity);
+  if (input.color !== undefined) data.color = input.color ? String(input.color) : null;
+
+  return prisma.zone.update({ where: { id: zoneId }, data });
+}
+
+/**
+ * Deleting a zone deletes the readings counted inside it - CrowdDensity cascades
+ * on the zone foreign key. The caller is told how many, because that history is
+ * the evidence behind any density figure already reported from it.
+ */
+export async function deleteCameraZone(zoneId: string) {
+  const existing = await prisma.zone.findUnique({
+    where: { id: zoneId },
+    select: { id: true, cameraId: true, name: true },
+  });
+  if (!existing) return null;
+  if (!existing.cameraId) {
+    throw new ValidationError('That zone belongs to an event, not a camera');
+  }
+
+  const readings = await prisma.crowdDensity.count({ where: { zoneId } });
+  await prisma.zone.delete({ where: { id: zoneId } });
+  return { id: zoneId, name: existing.name, readingsDeleted: readings };
+}

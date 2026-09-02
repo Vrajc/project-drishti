@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   Camera as CameraIcon, Search, Plus, MapPin, Pencil, Trash2, X, Loader, AlertTriangle, Map as MapIcon, Video,
+  Shapes,
 } from 'lucide-react';
 import MeshGradient from '../../components/MeshGradient';
 import Spotlight from '../../components/Spotlight';
@@ -13,6 +14,7 @@ import type {
   RegistryCamera, Department, Site, RegistryStats, CameraPayload,
 } from '../../services/surveillance.service';
 import { STATUS_PRESENTATION, STATUS_ORDER, formatLastSeen, formatCoordinates } from './cameraStatus';
+import CameraZonesModal from './CameraZonesModal';
 
 const PAGE_SIZE = 25;
 
@@ -142,6 +144,9 @@ const CameraRegistry: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // The camera whose counting zones are open. Nothing can be counted through a
+  // camera until at least one exists, so this is reachable from every row.
+  const [zoningCamera, setZoningCamera] = useState<RegistryCamera | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const loadCameras = useCallback(async () => {
@@ -527,6 +532,14 @@ const CameraRegistry: React.FC = () => {
                           <td className="px-4 py-3 align-top">
                             <div className="flex items-center justify-end gap-1">
                               <button
+                                onClick={() => setZoningCamera(camera)}
+                                aria-label={`Counting zones for ${camera.cameraId}`}
+                                title="Counting zones"
+                                className="icon-btn p-2 rounded-lg text-ai-gray-400 hover:text-ai-white hover:bg-ai-gray-800 transition-colors"
+                              >
+                                <Shapes className="w-4 h-4" />
+                              </button>
+                              <button
                                 onClick={() => openEdit(camera)}
                                 aria-label={`Edit ${camera.cameraId}`}
                                 className="icon-btn p-2 rounded-lg text-ai-gray-400 hover:text-ai-white hover:bg-ai-gray-800 transition-colors"
@@ -795,6 +808,14 @@ const CameraRegistry: React.FC = () => {
             </div>
           </motion.form>
         </div>
+      )}
+
+      {zoningCamera && (
+        <CameraZonesModal
+          camera={zoningCamera}
+          onClose={() => setZoningCamera(null)}
+          onChanged={loadCameras}
+        />
       )}
     </div>
   );
