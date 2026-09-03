@@ -10,16 +10,13 @@ import {
   MapPin,
   Brain,
   Eye,
-  Video,
-  Cpu,
-  Share2,
-  Database,
-  ScanLine,
-  Radio,
+  Camera,
+  Activity,
+  Bell,
   Siren,
   Layers,
   Lock,
-  Activity,
+  ShieldCheck,
   CheckCircle2,
   CircleDot,
 } from 'lucide-react';
@@ -34,319 +31,225 @@ import LandingHeader, { NavSection } from '../components/landing/LandingHeader';
 import ScrollProgress from '../components/landing/ScrollProgress';
 import SectionLabel from '../components/landing/SectionLabel';
 import TechMarquee from '../components/landing/TechMarquee';
-import PipelineFlow, { PipelineStep } from '../components/landing/PipelineFlow';
+import StepFlow, { FlowStep } from '../components/landing/StepFlow';
 import RoleTabs, { RoleDefinition } from '../components/landing/RoleTabs';
 import FaqAccordion, { FaqItem } from '../components/landing/FaqAccordion';
-import CountUp from '../components/landing/CountUp';
 import OrbitHud from '../components/landing/OrbitHud';
 
 /* ---------------------------------------------------------------------------
-   Page content. Kept out of the component so the markup below stays readable,
-   and so every claim on this page sits in one place where it can be checked
-   against docs/HLD.md, docs/SCALE-80K.md and the source itself.
+   Page copy. Kept out of the component so the markup stays readable — and in
+   one place, so it can be read straight through as the sentences a visitor
+   will actually meet. Written for someone deciding whether to trust this with
+   a crowd, not for someone reading the repository.
    --------------------------------------------------------------------------- */
 
 const NAV_SECTIONS: NavSection[] = [
-  { id: 'capabilities', label: 'Capabilities' },
-  { id: 'pipeline', label: 'Pipeline' },
-  { id: 'roles', label: 'Roles' },
-  { id: 'proof', label: 'Proof' },
+  { id: 'capabilities', label: 'What it does' },
+  { id: 'how', label: 'How it works' },
+  { id: 'roles', label: "Who it's for" },
   { id: 'faq', label: 'FAQ' },
 ];
 
-const STACK = [
-  'YOLOv8',
-  'ByteTrack',
-  'MediaMTX',
-  'Redis Streams',
-  'FastAPI',
-  'PostgreSQL',
-  'Prisma',
-  'Socket.IO',
-  'Express',
-  'React 18',
-  'Leaflet GIS',
-  'HLS.js',
-  'WebRTC',
-  'Docker Compose',
+const WATCHES_FOR = [
+  'Crowds building up',
+  'Overfull areas',
+  'Sudden surges',
+  'Blocked exits',
+  'Fires',
+  'Falls and injuries',
+  'Cameras going dark',
+  'Vehicles you flagged',
 ];
 
 const CAPABILITIES = [
   {
     icon: Shield,
-    title: 'AI Pre-Safety Planning',
-    description: 'Intelligent placement of safety infrastructure before events begin',
-    points: [
-      'Venue zones drawn as polygons on the map',
-      'A capacity threshold set per zone, not per venue',
-      'The plan carries into monitoring as live thresholds',
-    ],
-    metric: { value: 'Zone-level', label: 'capacity model' },
+    title: 'Plan before the gates open',
+    description:
+      'Map your venue, set how many people each area can safely hold, and decide where medical, exits and marshals go — before day one.',
+    metric: { value: 'Before', label: 'anyone arrives' },
   },
   {
     icon: Users,
-    title: 'Crowd Flow Analysis',
-    description: 'Predict bottlenecks and congestion 15-20 minutes in advance',
-    points: [
-      'Occupancy from ray-casting detection boxes against zone polygons',
-      'One density row per zone per interval, never per frame',
-      'Placement logic verified identical over 10,000 random points',
-    ],
+    title: 'See crowds building early',
+    description:
+      'You are told an area is filling up 15 to 20 minutes before it becomes a crush, with the exact spot on the map.',
     metric: { value: '15-20 min', label: 'early warning' },
   },
   {
     icon: AlertTriangle,
-    title: 'Anomaly Detection',
-    description: 'Real-time detection of emergencies, fires, and safety threats',
-    points: [
-      'Capacity breach and crowd surge evaluated on every reading',
-      'A camera going dark raises its own incident',
-      'Each firing writes a real incident row, attributed to the rule',
-    ],
-    metric: { value: '3 rules', label: 'raise incidents' },
+    title: 'Spot trouble the moment it starts',
+    description:
+      'Fires, falls and sudden surges are flagged as they appear, so nobody has to be staring at the right screen at the right second.',
+    metric: { value: 'Seconds', label: 'to spot it' },
   },
   {
     icon: MapPin,
-    title: 'Smart Dispatch',
-    description: 'Automated emergency response with optimal routing',
-    points: [
-      'Incident queue with unit assignment across departments',
-      'Straight-line distance shown, and labelled as straight-line',
-      'ETA stays empty until a real router can answer it',
-    ],
-    metric: { value: '30 units', label: 'seeded estate' },
+    title: 'Send help without the phone tag',
+    description:
+      'The nearest team gets the incident, the location and the details in one tap. No radio relay, no repeating yourself.',
+    metric: { value: 'One tap', label: 'to send help' },
   },
   {
     icon: Brain,
-    title: 'AI Summaries',
-    description: 'Conversational insights about event safety status',
-    points: [
-      'Plain-language questions answered from the event’s own rows',
-      'Risk read-out for the state the event is in right now',
-      'Post-event reports generated from what was recorded',
-    ],
-    metric: { value: 'Natural', label: 'language queries' },
+    title: 'Just ask what is going on',
+    description:
+      'Ask “how busy is the north gate?” in plain English and get a straight answer from what the cameras are seeing right now.',
+    metric: { value: 'Plain English', label: 'no training' },
   },
   {
     icon: Eye,
-    title: 'Live Monitoring',
-    description: 'Comprehensive dashboard for event safety oversight',
-    points: [
-      'HLS and WebRTC playback straight from the stream layer',
-      'Density, incidents and alerts pushed over one socket',
-      'A camera nobody has contacted reads grey, never green',
-    ],
-    metric: { value: '30 s', label: 'health probe' },
+    title: 'Everything on one screen',
+    description:
+      'Live video, crowd levels and open incidents in a single view that updates itself. No refreshing, no switching tabs.',
+    metric: { value: 'One screen', label: 'always live' },
   },
 ];
 
-const PIPELINE: PipelineStep[] = [
+const HOW_IT_WORKS: FlowStep[] = [
   {
-    icon: Video,
-    actor: 'mediamtx',
-    title: 'Ingest',
+    icon: Camera,
+    title: 'Connect the cameras you already have',
     description:
-      'Cameras publish RTSP. The stream layer republishes every path as HLS and WebRTC, so a browser plays live video with no plugin and no vendor client.',
-    facts: ['RTSP 8554', 'HLS 8888', 'WebRTC 8889', 'Any existing VMS'],
+      'Drishti works with your existing setup. There is nothing to install at the venue and no special hardware to buy — you point it at the cameras that are already there.',
   },
   {
-    icon: Cpu,
-    actor: 'ai-service',
-    title: 'Detect',
+    icon: Activity,
+    title: 'It learns what busy looks like',
     description:
-      'One asyncio worker per camera decodes every third frame and runs YOLOv8 detection with ByteTrack association, so an object keeps the same identity from frame to frame instead of being counted twice.',
-    facts: ['Python 3.11', 'FastAPI', 'YOLOv8 + ByteTrack', '~8 inferences/s/camera'],
+      'The system counts people in each area you have marked out and watches how those numbers move, so it can tell the difference between an area that is full and an area that is becoming dangerous.',
   },
   {
-    icon: MapPin,
-    actor: 'zones.py',
-    title: 'Place',
+    icon: Bell,
+    title: 'You hear about it early',
     description:
-      'Detection centres are ray-cast against the venue’s zone polygons to give occupancy per zone. Where boxes cannot be placed, occupancy is empty — which is not the same as every zone being empty.',
-    facts: ['Point-in-polygon', 'Verified over 10,000 points', 'Empty ≠ zero'],
-  },
-  {
-    icon: Share2,
-    actor: 'publisher.py',
-    title: 'Publish',
-    description:
-      'One event per detection onto a Redis Stream, against a contract both sides compile against. Two independent consumer groups read the same stream, so a stall on one side cannot hold up the other.',
-    facts: ['drishti:detections', '2 consumer groups', 'One shared contract'],
-  },
-  {
-    icon: Database,
-    actor: 'detectionConsumer',
-    title: 'Persist and evaluate',
-    description:
-      'The batch is grouped by frame, written as one density row per zone per interval, and handed straight to the rule engine, which raises an incident wherever a threshold is crossed.',
-    facts: ['CrowdDensity', 'ZONE_CAPACITY_BREACH', 'CROWD_SURGE'],
-  },
-  {
-    icon: ScanLine,
-    actor: 'matchEngine',
-    title: 'Match',
-    description:
-      'On its own consumer group: a sampled detection, a track point at the camera’s surveyed position, and a normalised plate compared against active watchlist entries. A match raises an alert; an exact match carries no score, because nothing was inferred.',
-    facts: ['Edit-distance scoring', 'TrackPoint', 'Cross-camera trail'],
-  },
-  {
-    icon: Radio,
-    actor: 'Socket.IO',
-    title: 'Push',
-    description:
-      'Density, incident and alert events go to the estate room and to the relevant event room. The police console and the organizer’s monitoring pages update without anyone pressing refresh.',
-    facts: ['crowd:density', 'incident:new', 'alert:new'],
+      'When an area starts heading the wrong way, a warning arrives with the location and how much time you have — early enough to open another exit rather than call an ambulance.',
   },
 ];
 
 const ROLES: RoleDefinition[] = [
   {
     id: 'organizer',
-    label: 'Organizer',
+    label: 'Event organizers',
     icon: Layers,
-    headline: 'Plan it, watch it, account for it',
+    headline: 'Run the event, not the panic',
     summary:
-      'The full event lifecycle in one workspace: define the venue and its zones, borrow cameras from the estate for the duration, watch density and incidents as they happen, and leave with a report built from what was actually recorded.',
+      'Everything from planning the venue to the report you send afterwards. Set up your areas, watch the crowd as it moves, deal with incidents while they are still small, and finish with a record of what actually happened.',
     abilities: [
-      'Event setup, and editing without losing recorded history',
-      'Pre-event safety planning per zone',
-      'Live monitoring with density and incident feeds',
-      'Crowd flow analysis and bottleneck warning',
-      'Anomaly review with incident status workflow',
-      'Emergency dispatch requests',
-      'Conversational AI summaries of the current state',
-      'Post-event reporting and export',
+      'Set up your event and mark out your venue',
+      'Watch crowd levels area by area',
+      'Get early warnings before an area fills up',
+      'Handle incidents and request help',
+      'Ask questions about your event in plain English',
+      'Download a report when it is over',
     ],
-    screens: [
-      '/organizer-dashboard',
-      '/event-setup',
-      '/pre-safety-planning',
-      '/live-monitoring',
-      '/crowd-flow-analysis',
-      '/anomaly-detection',
-      '/ai-summaries',
-      '/post-event-reports',
-    ],
-    boundary:
-      'No estate-wide registry, no watchlist, no vehicle tracking. An organizer may only assign cameras to an event they own, and may only release cameras currently on one of their events.',
+    privacy:
+      'You see your own events and nobody else’s — and never the wider city camera network.',
   },
   {
     id: 'police',
-    label: 'Police',
+    label: 'Safety teams',
     icon: Siren,
-    headline: 'A jurisdiction, not a venue',
+    headline: 'The whole area, not just one venue',
     summary:
-      'The surveillance layer exists independently of any event: departments, sites and cameras with real coordinates, health history, live wall, watchlist matching and cross-camera vehicle tracking. A district could deploy only this half.',
+      'A live picture of every connected camera across your sites: where they are, which ones are working, what they are seeing, and which unit is closest when something happens.',
     abilities: [
-      'Camera registry across departments and sites',
-      'GIS map with per-camera health state',
-      'Live wall of concurrent streams',
-      'Watchlist entries with CSV import',
-      'Alert feed with a triage workflow',
-      'Cross-camera vehicle trail with a time scrubber',
-      'Detection search with facets',
-      'Dispatch console with unit assignment',
+      'Every camera on one map',
+      'See at a glance which cameras are up and which are down',
+      'Watch several feeds side by side',
+      'Be alerted about vehicles you are looking for',
+      'Follow a vehicle from one camera to the next',
+      'Send the nearest unit straight to an incident',
     ],
-    screens: [
-      '/police/overview',
-      '/surveillance/cameras',
-      '/surveillance/map',
-      '/surveillance/live-wall',
-      '/police/watchlist',
-      '/police/alerts',
-      '/police/tracking',
-      '/police/dispatch',
-    ],
-    boundary:
-      'A police account cannot be self-registered. The role is granted by an administrator, and every route is authorised on the server as well as guarded in the browser.',
+    privacy:
+      'This access is granted by an administrator, never signed up for, and every action is checked against the role you were given.',
   },
   {
     id: 'participant',
-    label: 'Participant',
+    label: 'Attendees',
     icon: Users,
-    headline: 'The attendee gets their own app',
+    headline: 'Your event, in your pocket',
     summary:
-      'Attendees see the event, not the operations console. Discovery, registration, and a live view built for someone standing in the crowd rather than someone watching it from a control room.',
+      'People who came to enjoy the event get the event, not a control room. Find something to go to, sign up in seconds, and stay in the loop while you are there.',
     abilities: [
-      'Browse and search published events',
-      'Register in a couple of taps',
-      'Live updates for events they joined',
+      'Browse and search what is on',
+      'Sign up in a couple of taps',
+      'Live updates for events you joined',
       'Emergency contacts always one tap away',
-      'Venue location and navigation',
+      'Directions to the venue',
     ],
-    screens: ['/participant-dashboard', '/explore-events', '/my-events', '/live-updates'],
-    boundary:
-      'No camera feeds, no incident queue, no other attendee’s data. The participant view was split from the organizer console precisely so the two could never be confused.',
+    privacy:
+      'No camera feeds, no incident lists, and nothing at all about any other attendee.',
   },
   {
     id: 'admin',
-    label: 'Administrator',
+    label: 'Administrators',
     icon: Lock,
-    headline: 'Who is allowed to see what',
+    headline: 'Decide who sees what',
     summary:
-      'Platform oversight: accounts, role grants, event approval and the configuration that everything else runs on. The only place where a police or admin role can be handed out.',
+      'Accounts, permissions and oversight in one place — and the only place where someone can be given access to the camera network.',
     abilities: [
-      'User management across every role',
-      'Role grants, including police and admin',
-      'Platform-wide analytics',
-      'Event oversight and approval',
-      'Access control and system configuration',
+      'Manage accounts across the platform',
+      'Grant and remove access',
+      'Keep an eye on every event',
+      'A platform-wide overview',
     ],
-    screens: ['/admin-dashboard'],
-    boundary:
-      'Elevation is deliberate and logged. Registration refuses the admin and police roles outright, so the only path to one is an explicit grant.',
+    privacy:
+      'Handing out access is a deliberate act. Nobody can give it to themselves by signing up.',
+  },
+];
+
+const TRUST = [
+  {
+    icon: ShieldCheck,
+    title: 'It never guesses',
+    description:
+      'If the system does not know something yet, it says so. You will never be shown a confident-looking number that was invented to fill a gap.',
+  },
+  {
+    icon: Lock,
+    title: 'Privacy comes first',
+    description:
+      'Video stays inside your own system. Access is given out by name and role, and nobody can hand it to themselves.',
+  },
+  {
+    icon: Camera,
+    title: 'Works with what you have',
+    description:
+      'Your existing cameras, your existing network. Drishti points at them — it does not ask you to replace them.',
   },
 ];
 
 const FAQ: FaqItem[] = [
   {
-    question: 'Does this need new cameras?',
+    question: 'Do I need to buy new cameras?',
     answer:
-      'No. Cameras are addressed by URL, so any existing installation that can publish RTSP needs no change — point the registry at it. ONVIF fields are stored for devices that support discovery and PTZ, and the health poller speaks plain RTSP and HTTP including digest auth, so it works against real hardware without a vendor SDK.',
+      'No. Drishti works with the cameras you already have, as long as they are on your network. There is nothing to install at the venue and no special hardware to buy.',
   },
   {
-    question: 'What works if the detector is not running?',
+    question: 'Do I need a technical team to run it?',
     answer:
-      'Everything except the stream layer and the detector runs on Node and Postgres alone. The camera registry, health poller, map, watchlist and dispatch all work; pages that need detections show their empty state and say why. That is the intended behaviour, not a failure mode.',
+      'No. Setting up an event means filling in a form and marking out your areas on a map. Everything after that runs on its own, and when you want to know something you can ask in plain English rather than hunting through a dashboard.',
   },
   {
-    question: 'How does this scale past one venue?',
+    question: 'What happens if a camera goes down?',
     answer:
-      'The detector is a container that reads RTSP and publishes to Redis, so it runs at the edge on a Jetson beside the camera or centrally in a district data centre with no change to the contract. Frame stride is an environment variable, so a district under load can halve its inference cost without a redeploy, at the cost of temporal resolution.',
+      'You are told. A camera that stops responding is shown as offline and raises its own alert, so a blind spot is something you know about immediately rather than something you discover afterwards.',
   },
   {
-    question: 'Where do the numbers on a dashboard come from?',
+    question: 'Who can see the video?',
     answer:
-      'Every one of them is a real detection, a real database row, or a real computation. Where a real value does not exist yet, the interface says so: a camera nobody has contacted reads "Not yet probed" in grey, not red, and a cross-camera link with no plate is labelled probable and capped below certainty.',
+      'Only the people you have given access to, and only as far as their role allows. Attendees never see camera feeds at all, and access to the wider camera network has to be granted by an administrator — it cannot be signed up for.',
   },
   {
-    question: 'Is an event required to use it?',
+    question: 'Does it work for smaller events?',
     answer:
-      'No. The camera registry is standalone — departments, sites, cameras with GIS and health history, none of which depends on an event existing. The event layer is additive: an organizer borrows registry cameras for the duration of an event, and gives them back.',
+      'Yes. A single stage with two cameras works the same way as a stadium with fifty. You mark out fewer areas, and the warnings behave exactly the same.',
   },
   {
-    question: 'How is access separated between roles?',
+    question: 'How early are the warnings, really?',
     answer:
-      'Every route is authorised on the server, and guarded again in the browser so a signed-out user lands on the login page instead of a screen of failed requests. Participants never reach the operations consoles, organizers never reach the estate registry, and the admin and police roles cannot be self-registered.',
-  },
-];
-
-const NOT_BUILT = [
-  {
-    title: 'Face matching',
-    detail: 'The embedding column exists and is null on every row. A person entry is a record only.',
-  },
-  {
-    title: 'Road-distance ETA',
-    detail: 'The console says "ETA unavailable". Straight-line distance is shown, labelled as such.',
-  },
-  {
-    title: 'Observed frame rate',
-    detail: 'The health probe does not decode video, and only a decoder can report a frame rate honestly.',
-  },
-  {
-    title: 'PTZ control',
-    detail: 'Whether a camera is PTZ-capable is recorded. Nothing in this build drives the motor.',
+      'Typically 15 to 20 minutes before an area becomes dangerously full. That is the difference between calmly opening another exit and calling an ambulance.',
   },
 ];
 
@@ -430,7 +333,7 @@ const Landing: React.FC = () => {
                   Live
                 </span>
                 <span className="truncate text-xs text-ai-gray-300 sm:text-[13px]">
-                  Camera registry + event safety, on one database
+                  Spots crowd trouble before it starts
                 </span>
               </motion.div>
 
@@ -474,13 +377,13 @@ const Landing: React.FC = () => {
                 </HeroButtonExpandable>
 
                 <motion.button
-                  onClick={() => goto('pipeline')}
+                  onClick={() => goto('how')}
                   whileHover={{ scale: 1.02, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   transition={{ type: 'spring', stiffness: 400, damping: 17 }}
                   className="group flex w-full items-center justify-center gap-2 rounded-lg border border-ai-gray-700 px-6 py-3.5 text-sm font-medium text-ai-gray-200 transition-colors duration-300 hover:border-ai-gray-500 hover:text-ai-white sm:w-auto sm:px-8 sm:py-4 sm:text-base"
                 >
-                  See the pipeline
+                  See how it works
                   <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
                 </motion.button>
               </motion.div>
@@ -583,33 +486,32 @@ const Landing: React.FC = () => {
       </section>
 
       {/* ================================================================
-          STACK TICKER
+          WHAT IT WATCHES FOR
           ================================================================ */}
       <section className="relative z-10 border-y border-ai-gray-900 bg-ai-black/40 py-5 backdrop-blur-sm">
         <div className="page-container mb-3">
           <p className="text-center text-[11px] uppercase tracking-[0.2em] text-ai-gray-600">
-            Running on
+            Watching for
           </p>
         </div>
-        <TechMarquee items={STACK} />
+        <TechMarquee items={WATCHES_FOR} />
       </section>
 
       {/* ================================================================
-          01 — CAPABILITIES
+          01 — WHAT IT DOES
           ================================================================ */}
       <section id="capabilities" className="scroll-anchor relative py-16 sm:py-20 lg:py-28">
         <div className="page-container relative z-10">
           <div className="mb-10 text-center sm:mb-16">
-            <SectionLabel index="01">Six Core Capabilities</SectionLabel>
+            <SectionLabel index="01">What it does</SectionLabel>
 
-            <h2 className="mt-6 text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
-              <span className="text-ai-white">Comprehensive Safety</span>
-              <br />
-              <span className="text-recede">Infrastructure</span>
+            <h2 className="mx-auto mt-6 max-w-3xl text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
+              <span className="text-ai-white">Everything you need to keep</span>{' '}
+              <span className="text-recede">a crowd safe</span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-sm font-light text-ai-gray-400 sm:mt-6 sm:text-base md:text-lg">
-              Six integrated AI systems working together to ensure complete event oversight — each
-              one wired to the same detection stream, the same database and the same set of cameras.
+              Six things Drishti does for you, from the day you start planning to the report you
+              send after everyone has gone home.
             </p>
           </div>
 
@@ -632,7 +534,6 @@ const Landing: React.FC = () => {
                   icon={capability.icon}
                   title={capability.title}
                   description={capability.description}
-                  points={capability.points}
                   metric={capability.metric}
                   index={String(index + 1).padStart(2, '0')}
                   delay={0}
@@ -644,132 +545,42 @@ const Landing: React.FC = () => {
       </section>
 
       {/* ================================================================
-          02 — PIPELINE
+          02 — HOW IT WORKS
           ================================================================ */}
-      <section id="pipeline" className="scroll-anchor relative py-16 sm:py-20 lg:py-28">
+      <section id="how" className="scroll-anchor relative py-16 sm:py-20 lg:py-28">
         <div className="page-container relative z-10">
-          <div className="mb-10 max-w-3xl sm:mb-16">
-            <SectionLabel index="02">Frame to dispatch</SectionLabel>
+          <div className="mx-auto max-w-3xl">
+            <div className="mb-10 sm:mb-16">
+              <SectionLabel index="02">How it works</SectionLabel>
 
-            <h2 className="mt-6 text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
-              <span className="text-ai-white">One path from a photon</span>
-              <br />
-              <span className="text-recede">to a unit on the ground</span>
-            </h2>
-            <p className="mt-4 text-sm font-light text-ai-gray-400 sm:mt-6 sm:text-base md:text-lg">
-              Seven stages, each owned by a component you can open in the repository. Nothing in
-              this diagram is a metaphor — the names below are the modules that run.
-            </p>
-          </div>
-
-          <div className="grid gap-10 lg:grid-cols-[1.35fr_1fr] lg:gap-14">
-            <PipelineFlow steps={PIPELINE} />
-
-            {/* Aside: the contract, and the loop that runs beside all of it */}
-            <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-              <div className="edge-card overflow-hidden rounded-xl">
-                <div className="terminal-surface rounded-xl">
-                  <div className="flex items-center gap-2 border-b border-ai-gray-800 px-4 py-2.5">
-                    <span className="h-2.5 w-2.5 rounded-full bg-ai-gray-700" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-ai-gray-800" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-ai-gray-800" />
-                    <span className="ml-2 text-[11px] text-ai-gray-500">
-                      ai-service/contracts.py
-                    </span>
-                  </div>
-                  <pre className="table-scroll px-4 py-4">
-                    <code>
-                      <span className="tok-dim">{'{'}</span>
-                      {'\n  '}
-                      <span className="tok-key">"cameraId"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-str">"GNR-014"</span>
-                      <span className="tok-dim">,</span>
-                      {'\n  '}
-                      <span className="tok-key">"ts"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-str">"2026-09-10T11:04:22.310Z"</span>
-                      <span className="tok-dim">,</span>
-                      {'\n  '}
-                      <span className="tok-key">"trackId"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-num">42</span>
-                      <span className="tok-dim">,</span>
-                      {'\n  '}
-                      <span className="tok-key">"class"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-str">"car"</span>
-                      <span className="tok-dim">,</span>
-                      {'\n  '}
-                      <span className="tok-key">"confidence"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-num">0.91</span>
-                      <span className="tok-dim">,</span>
-                      {'\n  '}
-                      <span className="tok-key">"attributes"</span>
-                      <span className="tok-dim">: {'{'} </span>
-                      <span className="tok-key">"plateText"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-str">"GJ01AB1234"</span>
-                      <span className="tok-dim"> {'}'},</span>
-                      {'\n  '}
-                      <span className="tok-key">"zoneOccupancy"</span>
-                      <span className="tok-dim">: {'{'} </span>
-                      <span className="tok-key">"&lt;zone-uuid&gt;"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-num">14</span>
-                      <span className="tok-dim"> {'}'},</span>
-                      {'\n  '}
-                      <span className="tok-key">"snapshotPath"</span>
-                      <span className="tok-dim">: </span>
-                      <span className="tok-str">"/snapshots/GNR-014/…jpg"</span>
-                      {'\n'}
-                      <span className="tok-dim">{'}'}</span>
-                    </code>
-                  </pre>
-                </div>
-              </div>
-
-              <p className="text-xs leading-relaxed text-ai-gray-500">
-                Both halves of the system compile against this shape. A field with no measured value
-                is <code className="text-ai-gray-300">null</code>, never a plausible default.
+              <h2 className="mt-6 text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
+                <span className="text-ai-white">Three steps.</span>{' '}
+                <span className="text-recede">That is the whole thing.</span>
+              </h2>
+              <p className="mt-4 text-sm font-light text-ai-gray-400 sm:mt-6 sm:text-base md:text-lg">
+                No control room to build, no training course to sit through.
               </p>
-
-              <div className="edge-card glassmorphism rounded-xl border border-ai-gray-800 p-5">
-                <div className="mb-3 flex items-center gap-2.5">
-                  <Activity className="h-4 w-4 text-ai-white" strokeWidth={1.5} />
-                  <span className="text-sm font-semibold text-ai-white">
-                    Running beside all of it
-                  </span>
-                </div>
-                <p className="text-sm leading-relaxed text-ai-gray-400">
-                  Every 30 seconds the health poller opens a socket to each camera, speaks RTSP
-                  <code className="mx-1 text-ai-gray-300">OPTIONS</code> then
-                  <code className="mx-1 text-ai-gray-300">DESCRIBE</code>, and writes the result.
-                  A transition to offline raises its own incident — so a blind camera is an event,
-                  not a silence.
-                </p>
-              </div>
             </div>
+
+            <StepFlow steps={HOW_IT_WORKS} />
           </div>
         </div>
       </section>
 
       {/* ================================================================
-          03 — ROLES
+          03 — WHO IT IS FOR
           ================================================================ */}
       <section id="roles" className="scroll-anchor relative py-16 sm:py-20 lg:py-28">
         <div className="page-container relative z-10">
           <div className="mb-10 text-center sm:mb-16">
-            <SectionLabel index="03">Four audiences, one login</SectionLabel>
+            <SectionLabel index="03">Who it is for</SectionLabel>
 
             <h2 className="mx-auto mt-6 max-w-3xl text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
-              <span className="text-ai-white">Every role gets its own app,</span>{' '}
-              <span className="text-recede">and its own limits</span>
+              <span className="text-ai-white">Four very different people,</span>{' '}
+              <span className="text-recede">one app</span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-sm font-light text-ai-gray-400 sm:mt-6 sm:text-base md:text-lg">
-              What you can reach is decided on the server and enforced again in the browser. These
-              are the real routes, not a marketing sitemap.
+              What you see depends entirely on who you are.
             </p>
           </div>
 
@@ -778,148 +589,56 @@ const Landing: React.FC = () => {
       </section>
 
       {/* ================================================================
-          04 — PROOF
+          04 — TRUST
           ================================================================ */}
-      <section id="proof" className="scroll-anchor relative py-16 sm:py-20 lg:py-28">
+      <section id="trust" className="scroll-anchor relative py-16 sm:py-20 lg:py-28">
         <div className="page-container relative z-10">
-          <div className="mb-10 max-w-3xl sm:mb-16">
-            <SectionLabel index="04">Measured, not claimed</SectionLabel>
+          <div className="mb-10 text-center sm:mb-16">
+            <SectionLabel index="04">Why you can trust it</SectionLabel>
 
-            <h2 className="mt-6 text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
-              <span className="text-ai-white">If a number reaches you,</span>
-              <br />
-              <span className="text-recede">something measured it</span>
+            <h2 className="mx-auto mt-6 max-w-3xl text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
+              <span className="text-ai-white">Built to be believed</span>{' '}
+              <span className="text-recede">on a bad day</span>
             </h2>
-            <p className="mt-4 text-sm font-light text-ai-gray-400 sm:mt-6 sm:text-base md:text-lg">
-              The figures below were taken on a development machine — CPU only, no GPU, remote
-              database. They are floor values, not headline values.
-            </p>
           </div>
 
-          {/* Measured numbers */}
-          <div className="edge-card glassmorphism mb-6 grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-ai-gray-800 bg-ai-gray-800/60 sm:mb-8 lg:grid-cols-4">
-            {[
-              { value: <CountUp to={56} />, unit: 'cameras', label: 'probed over real sockets' },
-              {
-                value: <CountUp to={1.48} decimals={2} />,
-                unit: 'seconds',
-                label: 'to sweep all 56, after batching',
-              },
-              {
-                value: <CountUp to={437} />,
-                unit: 'ms',
-                label: 'vehicle trail across four cameras',
-              },
-              { value: <span className="tabular">0</span>, unit: 'invented', label: 'values in the source, down from 76' },
-            ].map((stat, index) => (
-              <motion.div
-                key={stat.label}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: index * 0.08 }}
-                className="bg-ai-black/70 p-5 sm:p-6"
-              >
-                <div className="flex items-baseline gap-1.5">
-                  <span className="text-2xl font-bold text-ai-white sm:text-3xl md:text-4xl">
-                    {stat.value}
-                  </span>
-                  <span className="text-xs text-ai-gray-500 sm:text-sm">{stat.unit}</span>
-                </div>
-                <div className="mt-2 text-xs leading-relaxed text-ai-gray-400 sm:text-sm">
-                  {stat.label}
-                </div>
-              </motion.div>
-            ))}
+          <div className="grid gap-4 sm:gap-6 md:grid-cols-3">
+            {TRUST.map((item, index) => {
+              const Icon = item.icon;
+              return (
+                <motion.div
+                  key={item.title}
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-60px' }}
+                  transition={{ duration: 0.5, delay: index * 0.08 }}
+                  className="edge-card glassmorphism rounded-2xl border border-ai-gray-800 p-6 sm:p-8"
+                >
+                  <Icon className="mb-5 h-6 w-6 text-ai-white" strokeWidth={1.5} />
+                  <h3 className="mb-2.5 text-lg font-semibold tracking-tight text-ai-white">
+                    {item.title}
+                  </h3>
+                  <p className="text-sm font-light leading-relaxed text-ai-gray-400">
+                    {item.description}
+                  </p>
+                </motion.div>
+              );
+            })}
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* The guard */}
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-80px' }}
-              transition={{ duration: 0.6 }}
-              className="edge-card flex flex-col overflow-hidden rounded-2xl"
-            >
-              <div className="terminal-surface flex-1 rounded-2xl p-5 sm:p-6">
-                <div className="mb-4 flex items-center gap-2 text-[11px] text-ai-gray-500">
-                  <span className="h-2.5 w-2.5 rounded-full bg-ai-gray-700" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-ai-gray-800" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-ai-gray-800" />
-                  <span className="ml-2">verify</span>
-                </div>
-                <pre className="table-scroll leading-relaxed">
-                  <code>
-                    <span className="tok-dim">$ </span>
-                    <span className="tok-str">npm run verify</span>
-                    {'\n\n'}
-                    <span className="tok-ok">✓</span>
-                    <span className="tok-dim"> type-check </span>
-                    <span className="tok-key">backend</span>
-                    {'\n'}
-                    <span className="tok-ok">✓</span>
-                    <span className="tok-dim"> type-check </span>
-                    <span className="tok-key">frontend</span>
-                    {'\n'}
-                    <span className="tok-ok">✓</span>
-                    <span className="tok-dim"> fabrication guard </span>
-                    <span className="tok-key">PASS</span>
-                    <span className="tok-dim"> — 0 invented values</span>
-                    {'\n'}
-                    <span className="tok-dim">                     (3 allowlisted: particles,</span>
-                    {'\n'}
-                    <span className="tok-dim">                      id generation, one filename)</span>
-                  </code>
-                </pre>
-              </div>
-            </motion.div>
-
-            {/* What is not built */}
-            <motion.div
-              initial={{ opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-80px' }}
-              transition={{ duration: 0.6, delay: 0.1 }}
-              className="edge-card glassmorphism rounded-2xl border border-ai-gray-800 p-5 sm:p-8"
-            >
-              <h3 className="mb-1.5 text-lg font-semibold tracking-tight text-ai-white sm:text-xl">
-                What is not built
-              </h3>
-              <p className="mb-5 text-sm text-ai-gray-500">
-                Stated plainly, because a system that omits its gaps cannot be audited.
-              </p>
-
-              <ul className="space-y-4">
-                {NOT_BUILT.map((item) => (
-                  <li key={item.title} className="flex gap-3 border-b border-ai-gray-900 pb-4 last:border-0 last:pb-0">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ai-gray-600" />
-                    <div>
-                      <div className="text-sm font-medium text-ai-gray-200">{item.title}</div>
-                      <div className="mt-0.5 text-xs leading-relaxed text-ai-gray-500 sm:text-sm">
-                        {item.detail}
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </motion.div>
-          </div>
-
-          {/* The rule itself */}
           <motion.blockquote
             initial={{ opacity: 0, y: 24 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="mt-6 rounded-2xl border-l-2 border-ai-white bg-ai-gray-900/40 p-5 sm:mt-8 sm:p-8"
+            className="mx-auto mt-6 max-w-3xl rounded-2xl border-l-2 border-ai-white bg-ai-gray-900/40 p-6 sm:mt-8 sm:p-8"
           >
             <p className="text-base font-light leading-relaxed text-ai-gray-200 sm:text-lg md:text-xl">
-              “Every number a user sees is derived from a real detection, a real database row, or a
-              real computation. Where a real value does not exist yet, the interface says so.”
+              “Every number you see comes from something we actually measured. Where we do not have
+              a real answer yet, we say so.”
             </p>
             <footer className="mt-3 text-xs uppercase tracking-[0.16em] text-ai-gray-600">
-              The rule the architecture is built around
+              The rule the whole system is built on
             </footer>
           </motion.blockquote>
         </div>
@@ -934,14 +653,9 @@ const Landing: React.FC = () => {
             <div className="lg:sticky lg:top-24 lg:self-start">
               <SectionLabel index="05">Questions</SectionLabel>
               <h2 className="mt-6 text-2xl font-bold tracking-tight xs:text-3xl md:text-4xl">
-                <span className="text-ai-white">The answers</span>
-                <br />
-                <span className="text-recede">an operator asks for</span>
+                <span className="text-ai-white">The things</span>{' '}
+                <span className="text-recede">people actually ask</span>
               </h2>
-              <p className="mt-4 text-sm font-light text-ai-gray-400 sm:text-base">
-                Deployment, degradation, scale and access — the four things that decide whether a
-                safety system survives contact with a real venue.
-              </p>
             </div>
 
             <FaqAccordion items={FAQ} />
@@ -1024,9 +738,9 @@ const Landing: React.FC = () => {
 
               <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-ai-gray-500">
                 {[
+                  'Works with your cameras',
+                  'Nothing to install at the venue',
                   'Privacy-first by design',
-                  'Works with existing RTSP cameras',
-                  'Degrades honestly, never silently',
                 ].map((chip) => (
                   <span key={chip} className="flex items-center gap-1.5">
                     <CheckCircle2 className="h-3.5 w-3.5 text-ai-gray-500" strokeWidth={1.5} />
@@ -1047,8 +761,8 @@ const Landing: React.FC = () => {
           ================================================================ */}
       <footer className="safe-bottom relative z-10 border-t border-ai-gray-900 pt-12 sm:pt-16">
         <div className="page-container">
-          <div className="grid gap-8 pb-10 sm:grid-cols-2 lg:grid-cols-4 lg:gap-12">
-            <div className="sm:col-span-2 lg:col-span-1">
+          <div className="grid gap-8 pb-10 sm:grid-cols-2 lg:grid-cols-3 lg:gap-12">
+            <div>
               <div className="mb-4 flex items-center gap-3">
                 <span className="flex h-9 w-9 items-center justify-center rounded-md bg-ai-white">
                   <span className="text-lg font-bold text-ai-black">&#10022;</span>
@@ -1056,14 +770,13 @@ const Landing: React.FC = () => {
                 <span className="text-xl font-bold tracking-tight">Drishti</span>
               </div>
               <p className="max-w-xs text-sm font-light leading-relaxed text-ai-gray-500">
-                A camera registry that stands on its own, and an event-safety layer that borrows
-                from it. One database, one authentication system, one set of cameras.
+                AI that watches the crowd, so your team can look after the people in it.
               </p>
             </div>
 
             <div>
               <h4 className="mb-4 text-[11px] uppercase tracking-[0.18em] text-ai-gray-600">
-                Platform
+                Explore
               </h4>
               <ul className="space-y-2.5">
                 {NAV_SECTIONS.map((section) => (
@@ -1073,24 +786,6 @@ const Landing: React.FC = () => {
                       className="text-sm text-ai-gray-400 transition-colors hover:text-ai-white"
                     >
                       {section.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <h4 className="mb-4 text-[11px] uppercase tracking-[0.18em] text-ai-gray-600">
-                Consoles
-              </h4>
-              <ul className="space-y-2.5">
-                {ROLES.map((role) => (
-                  <li key={role.id}>
-                    <button
-                      onClick={() => navigate('/login')}
-                      className="text-sm text-ai-gray-400 transition-colors hover:text-ai-white"
-                    >
-                      {role.label}
                     </button>
                   </li>
                 ))}
@@ -1123,7 +818,7 @@ const Landing: React.FC = () => {
                     onClick={() => navigate('/explore-events')}
                     className="text-sm text-ai-gray-400 transition-colors hover:text-ai-white"
                   >
-                    Explore events
+                    Browse events
                   </button>
                 </li>
               </ul>
@@ -1134,9 +829,7 @@ const Landing: React.FC = () => {
             <p className="text-xs font-light text-ai-gray-600 sm:text-sm">
               © 2025 Drishti. Built for hackathon demonstration. Privacy-first design.
             </p>
-            <p className="text-xs text-ai-gray-700">
-              Gujarat Police Innovation Challenge 2026 · Model 1 + event safety
-            </p>
+            <p className="text-xs text-ai-gray-700">Gujarat Police Innovation Challenge 2026</p>
           </div>
         </div>
       </footer>

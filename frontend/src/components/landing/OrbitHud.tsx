@@ -3,15 +3,15 @@ import { motion, useReducedMotion } from 'framer-motion';
 import SplineScene from '../SplineScene';
 
 const STAGES = [
-  { label: 'RTSP INGEST', position: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2' },
-  { label: 'YOLOv8 + BYTETRACK', position: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2' },
-  { label: 'REDIS STREAMS', position: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2' },
-  { label: 'SOCKET.IO PUSH', position: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2' },
+  { label: 'WATCHING', position: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2' },
+  { label: 'COUNTING', position: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2' },
+  { label: 'PREDICTING', position: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2' },
+  { label: 'ALERTING', position: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2' },
 ] as const;
 
 /**
  * The hero's right-hand visual: the existing orbit composition, with the four
- * stages of the pipeline riding a slow carousel around it and a framing
+ * things the system is doing riding a slow carousel around it and a framing
  * bracket that makes the whole thing read as an instrument rather than an
  * ornament. Labels counter-rotate so they stay upright as the ring turns.
  */

@@ -1169,22 +1169,7 @@ video {
   to { transform: translate3d(-50%, 0, 0); }
 }
 
-/* Terminal / code surface used for the detection contract and verify output */
-.terminal-surface {
-  background: linear-gradient(180deg, rgba(12, 12, 12, 0.94), rgba(6, 6, 6, 0.94));
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  font-family: 'SFMono-Regular', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
-  font-size: 0.75rem;
-  line-height: 1.7;
-}
-
-.terminal-surface .tok-key { color: #B3B3B3; }
-.terminal-surface .tok-str { color: #FFFFFF; }
-.terminal-surface .tok-num { color: #D9D9D9; }
-.terminal-surface .tok-dim { color: #5C5C5C; }
-.terminal-surface .tok-ok { color: #86efac; }
-
-/* Pipeline rail — the vertical line a step list hangs off */
+/* Step rail — the vertical line the "how it works" list hangs off */
 .pipeline-rail {
   background: linear-gradient(
     180deg,
@@ -1195,20 +1180,8 @@ video {
   );
 }
 
-/* A pulse that runs down the rail, so the diagram reads as a flow */
-@keyframes rail-pulse {
-  0% { transform: translateY(-10%); opacity: 0; }
-  15% { opacity: 1; }
-  85% { opacity: 1; }
-  100% { transform: translateY(1000%); opacity: 0; }
-}
-
-.rail-pulse {
-  animation: rail-pulse 4.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-}
-
-/* Numerals in stat blocks: tabular so a counting animation doesn't jitter
-   the layout as digit widths change. */
+/* Numerals in stat blocks: tabular so mixed digits keep an even rhythm and
+   never shift the layout as they change. */
 .tabular {
   font-variant-numeric: tabular-nums;
   font-feature-settings: 'tnum' 1;
