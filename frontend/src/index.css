@@ -1056,3 +1056,176 @@ video {
   color: #05203f;
   box-shadow: 0 0 0 4px rgba(96, 165, 250, 0.4);
 }
+
+/* ==========================================================================
+   Landing page — surface treatments
+   Everything here is decorative and scoped to the marketing page. The global
+   prefers-reduced-motion block above already neutralises the animations.
+   ========================================================================== */
+
+/* Slow-drifting light behind the whole page. Two very low-opacity radial
+   sweeps at different periods never line up, so the background reads as
+   alive without ever resolving into a shape you can point at. */
+.landing-aurora {
+  background:
+    radial-gradient(60% 45% at 20% 12%, rgba(255, 255, 255, 0.055) 0%, transparent 60%),
+    radial-gradient(50% 40% at 82% 30%, rgba(255, 255, 255, 0.04) 0%, transparent 62%),
+    radial-gradient(70% 50% at 50% 100%, rgba(255, 255, 255, 0.03) 0%, transparent 65%);
+  animation: aurora-drift 24s ease-in-out infinite alternate;
+}
+
+@keyframes aurora-drift {
+  0% { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(0, -3%, 0) scale(1.06); }
+}
+
+/* Film grain. Kills the banding that large soft gradients produce on
+   8-bit panels, and stops pure black from looking like a dead pixel field. */
+.grain-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  opacity: 0.035;
+  mix-blend-mode: overlay;
+}
+
+/* Headline treatment: a highlight travels across the letterforms instead of
+   the whole word changing colour. */
+.text-shine {
+  background-image: linear-gradient(
+    100deg,
+    #FFFFFF 0%, #FFFFFF 42%, #7A7A7A 50%, #FFFFFF 58%, #FFFFFF 100%
+  );
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: text-shine 7s linear infinite;
+}
+
+@keyframes text-shine {
+  from { background-position: 250% 0; }
+  to { background-position: -250% 0; }
+}
+
+/* Muted second line of a two-tone heading */
+.text-recede {
+  color: #5C5C5C;
+}
+
+/* Hairline gradient border drawn with a mask, so the corner radius is
+   inherited and the border can fade out along its length. */
+.edge-card {
+  position: relative;
+  isolation: isolate;
+}
+
+.edge-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.22) 0%,
+    rgba(255, 255, 255, 0.02) 38%,
+    rgba(255, 255, 255, 0.02) 62%,
+    rgba(255, 255, 255, 0.14) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: -1;
+  transition: opacity 0.4s ease;
+  opacity: 0.75;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .edge-card:hover::before { opacity: 1; }
+}
+
+/* Infinite ticker. The track holds the list twice and translates exactly
+   -50%, so the seam lands on an identical frame. */
+.marquee-viewport {
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 42s linear infinite;
+}
+
+.marquee-viewport:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+/* Terminal / code surface used for the detection contract and verify output */
+.terminal-surface {
+  background: linear-gradient(180deg, rgba(12, 12, 12, 0.94), rgba(6, 6, 6, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  font-family: 'SFMono-Regular', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+  line-height: 1.7;
+}
+
+.terminal-surface .tok-key { color: #B3B3B3; }
+.terminal-surface .tok-str { color: #FFFFFF; }
+.terminal-surface .tok-num { color: #D9D9D9; }
+.terminal-surface .tok-dim { color: #5C5C5C; }
+.terminal-surface .tok-ok { color: #86efac; }
+
+/* Pipeline rail — the vertical line a step list hangs off */
+.pipeline-rail {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.18) 8%,
+    rgba(255, 255, 255, 0.18) 92%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* A pulse that runs down the rail, so the diagram reads as a flow */
+@keyframes rail-pulse {
+  0% { transform: translateY(-10%); opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { transform: translateY(1000%); opacity: 0; }
+}
+
+.rail-pulse {
+  animation: rail-pulse 4.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Numerals in stat blocks: tabular so a counting animation doesn't jitter
+   the layout as digit widths change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Anchored sections must clear the fixed header when jumped to */
+.scroll-anchor {
+  scroll-margin-top: 5.5rem;
+}
+
+/* Without background-clip:text the shine rule would leave the headline
+   transparent, i.e. invisible. Paint it plain white instead. */
+@supports not ((-webkit-background-clip: text) or (background-clip: text)) {
+  .text-shine {
+    background-image: none;
+    color: #FFFFFF;
+    -webkit-text-fill-color: #FFFFFF;
+    animation: none;
+  }
+}
