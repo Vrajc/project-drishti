@@ -4,19 +4,20 @@ import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,
   ArrowUp,
-  Shield,
+  CalendarCheck,
+  CalendarPlus,
   Users,
   AlertTriangle,
   MapPin,
-  Brain,
-  Eye,
-  Camera,
+  Megaphone,
+  FileText,
+  ClipboardList,
   Activity,
-  Bell,
-  Siren,
+  HeartPulse,
   Layers,
   Lock,
   ShieldCheck,
+  PlugZap,
   CheckCircle2,
   CircleDot,
 } from 'lucide-react';
@@ -51,79 +52,79 @@ const NAV_SECTIONS: NavSection[] = [
 ];
 
 const WATCHES_FOR = [
-  'Crowds building up',
-  'Overfull areas',
+  'Crowds building at a stage',
+  'Queues at the gates',
+  'Areas past their safe limit',
   'Sudden surges',
   'Blocked exits',
-  'Fires',
   'Falls and injuries',
-  'Cameras going dark',
-  'Vehicles you flagged',
+  'Fires',
+  'Medical emergencies',
 ];
 
 const CAPABILITIES = [
   {
-    icon: Shield,
-    title: 'Plan before the gates open',
+    icon: CalendarPlus,
+    title: 'Set up an event in minutes',
     description:
-      'Map your venue, set how many people each area can safely hold, and decide where medical, exits and marshals go — before day one.',
-    metric: { value: 'Before', label: 'anyone arrives' },
+      'Say where it is and when, mark the areas that matter — the stage, the gates, the food court — and publish it so people can find it and sign up.',
+    metric: { value: 'Minutes', label: 'to go live' },
   },
   {
     icon: Users,
     title: 'See crowds building early',
     description:
-      'You are told an area is filling up 15 to 20 minutes before it becomes a crush, with the exact spot on the map.',
+      'You are told an area is filling up 15 to 20 minutes before it becomes a crush, with the exact spot on your venue map.',
     metric: { value: '15-20 min', label: 'early warning' },
   },
   {
     icon: AlertTriangle,
     title: 'Spot trouble the moment it starts',
     description:
-      'Fires, falls and sudden surges are flagged as they appear, so nobody has to be staring at the right screen at the right second.',
+      'Falls, fires and sudden surges are flagged as they happen, so nobody has to be staring at the right screen at the right second.',
     metric: { value: 'Seconds', label: 'to spot it' },
   },
   {
     icon: MapPin,
     title: 'Send help without the phone tag',
     description:
-      'The nearest team gets the incident, the location and the details in one tap. No radio relay, no repeating yourself.',
+      'The nearest marshal or medic gets the incident, the location and the details in one tap. No radio relay, no repeating yourself.',
     metric: { value: 'One tap', label: 'to send help' },
   },
   {
-    icon: Brain,
-    title: 'Just ask what is going on',
+    icon: Megaphone,
+    title: 'Keep your attendees in the loop',
     description:
-      'Ask “how busy is the north gate?” in plain English and get a straight answer from what the cameras are seeing right now.',
-    metric: { value: 'Plain English', label: 'no training' },
+      'The people who signed up get live updates about your event on their own phone, and emergency contacts are always one tap away.',
+    metric: { value: 'Everyone', label: 'kept informed' },
   },
   {
-    icon: Eye,
-    title: 'Everything on one screen',
+    icon: FileText,
+    title: 'Finish with a report, not a memory',
     description:
-      'Live video, crowd levels and open incidents in a single view that updates itself. No refreshing, no switching tabs.',
-    metric: { value: 'One screen', label: 'always live' },
+      'When it is over you get a write-up of how the day went and every incident in it. You can also just ask, in plain English, what happened at eight o’clock.',
+    metric: { value: 'Same day', label: 'full report' },
   },
 ];
 
 const HOW_IT_WORKS: FlowStep[] = [
   {
-    icon: Camera,
-    title: 'Connect the cameras you already have',
+    icon: CalendarCheck,
+    title: 'Set up your event',
     description:
-      'Drishti works with your existing setup. There is nothing to install at the venue and no special hardware to buy — you point it at the cameras that are already there.',
+      'Tell Drishti where it is, when it is, and mark out the areas that matter — the stage, the gates, the food court. Publish it, and people can find your event and sign up. That is the whole setup.',
   },
   {
     icon: Activity,
-    title: 'It learns what busy looks like',
+    title: 'Watch it as it happens',
     description:
-      'The system counts people in each area you have marked out and watches how those numbers move, so it can tell the difference between an area that is full and an area that is becoming dangerous.',
+      'Once the doors open you get a live picture of how full each area is, and a warning when one starts heading the wrong way — early enough to open another exit rather than call an ambulance. It reads this from the cameras the venue already has.',
   },
   {
-    icon: Bell,
-    title: 'You hear about it early',
+    icon: ClipboardList,
+    title: 'Close it out',
     description:
-      'When an area starts heading the wrong way, a warning arrives with the location and how much time you have — early enough to open another exit rather than call an ambulance.',
+      'When the event ends you get the report: how the crowd moved through the day, every incident, and what was done about each one. Hand it to whoever needs it.',
   },
 ];
 
@@ -144,25 +145,24 @@ const ROLES: RoleDefinition[] = [
       'Download a report when it is over',
     ],
     privacy:
-      'You see your own events and nobody else’s — and never the wider city camera network.',
+      'You see your own events and nobody else’s, and only for as long as they are yours.',
   },
   {
-    id: 'police',
+    id: 'safety',
     label: 'Safety teams',
-    icon: Siren,
-    headline: 'The whole area, not just one venue',
+    icon: HeartPulse,
+    headline: 'Everyone on the ground sees the same thing',
     summary:
-      'A live picture of every connected camera across your sites: where they are, which ones are working, what they are seeing, and which unit is closest when something happens.',
+      'Marshals, medics and security stop working from second-hand radio traffic. The same live picture the organizer has, on the phone in their pocket, with the incidents that are actually theirs.',
     abilities: [
-      'Every camera on one map',
-      'See at a glance which cameras are up and which are down',
-      'Watch several feeds side by side',
-      'Be alerted about vehicles you are looking for',
-      'Follow a vehicle from one camera to the next',
-      'Send the nearest unit straight to an incident',
+      'The live crowd picture for the event you are working',
+      'Incidents as they are raised, with the exact location',
+      'Be sent to the right place instead of the general area',
+      'Mark an incident as being dealt with, and as done',
+      'Early warnings before an area becomes a problem',
     ],
     privacy:
-      'This access is granted by an administrator, never signed up for, and every action is checked against the role you were given.',
+      'This access is granted by an administrator, never signed up for, and every action is checked against the role that was given.',
   },
   {
     id: 'participant',
@@ -187,7 +187,7 @@ const ROLES: RoleDefinition[] = [
     icon: Lock,
     headline: 'Decide who sees what',
     summary:
-      'Accounts, permissions and oversight in one place — and the only place where someone can be given access to the camera network.',
+      'Accounts, permissions and oversight in one place — and the only place where someone can be given access to an event’s live view.',
     abilities: [
       'Manage accounts across the platform',
       'Grant and remove access',
@@ -208,48 +208,48 @@ const TRUST = [
   },
   {
     icon: Lock,
-    title: 'Privacy comes first',
+    title: 'Your attendees are counted, not identified',
     description:
-      'Video stays inside your own system. Access is given out by name and role, and nobody can hand it to themselves.',
+      'Drishti works out how many people are in an area, not who they are. Nobody is named, and what it sees stays inside your own system.',
   },
   {
-    icon: Camera,
-    title: 'Works with what you have',
+    icon: PlugZap,
+    title: 'Nothing new to buy',
     description:
-      'Your existing cameras, your existing network. Drishti points at them — it does not ask you to replace them.',
+      'It runs on the cameras the venue already has. No hardware order, no installation day, no six-month project before your first event.',
   },
 ];
 
 const FAQ: FaqItem[] = [
   {
-    question: 'Do I need to buy new cameras?',
+    question: 'How long does it take to get an event running?',
     answer:
-      'No. Drishti works with the cameras you already have, as long as they are on your network. There is nothing to install at the venue and no special hardware to buy.',
-  },
-  {
-    question: 'Do I need a technical team to run it?',
-    answer:
-      'No. Setting up an event means filling in a form and marking out your areas on a map. Everything after that runs on its own, and when you want to know something you can ask in plain English rather than hunting through a dashboard.',
-  },
-  {
-    question: 'What happens if a camera goes down?',
-    answer:
-      'You are told. A camera that stops responding is shown as offline and raises its own alert, so a blind spot is something you know about immediately rather than something you discover afterwards.',
-  },
-  {
-    question: 'Who can see the video?',
-    answer:
-      'Only the people you have given access to, and only as far as their role allows. Attendees never see camera feeds at all, and access to the wider camera network has to be granted by an administrator — it cannot be signed up for.',
+      'Minutes. Create the event, mark out the areas that matter on the map, and publish it. Most organizers do the whole thing in one sitting, without anyone technical in the room.',
   },
   {
     question: 'Does it work for smaller events?',
     answer:
-      'Yes. A single stage with two cameras works the same way as a stadium with fifty. You mark out fewer areas, and the warnings behave exactly the same.',
+      'Yes. A single stage with a few hundred people works exactly like a stadium with fifty thousand — you mark out fewer areas, and the warnings behave the same. Nothing about it assumes a big budget or a control room.',
+  },
+  {
+    question: 'Do my attendees have to install anything?',
+    answer:
+      'No. They browse what is on, sign up and get live updates in an ordinary browser, on whatever phone they already carry.',
+  },
+  {
+    question: 'What does my team actually do during the event?',
+    answer:
+      'Watch one screen and act on what it tells them. Warnings arrive with the location attached, incidents can be sent to the nearest marshal or medic in a tap, and everyone on the ground is looking at the same picture instead of relaying it over radio.',
   },
   {
     question: 'How early are the warnings, really?',
     answer:
       'Typically 15 to 20 minutes before an area becomes dangerously full. That is the difference between calmly opening another exit and calling an ambulance.',
+  },
+  {
+    question: 'What do I get once it is over?',
+    answer:
+      'A report of how the event went: how the crowd moved through the day, every incident that was raised, and what was done about each one. You can also just ask it questions in plain English rather than reading the whole thing.',
   },
 ];
 
@@ -333,7 +333,7 @@ const Landing: React.FC = () => {
                   Live
                 </span>
                 <span className="truncate text-xs text-ai-gray-300 sm:text-[13px]">
-                  Spots crowd trouble before it starts
+                  Plan it, run it safely, report on it
                 </span>
               </motion.div>
 
@@ -506,8 +506,8 @@ const Landing: React.FC = () => {
             <SectionLabel index="01">What it does</SectionLabel>
 
             <h2 className="mx-auto mt-6 max-w-3xl text-2xl font-bold tracking-tight xs:text-3xl md:text-5xl">
-              <span className="text-ai-white">Everything you need to keep</span>{' '}
-              <span className="text-recede">a crowd safe</span>
+              <span className="text-ai-white">Everything your event needs</span>{' '}
+              <span className="text-recede">from first plan to final report</span>
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-sm font-light text-ai-gray-400 sm:mt-6 sm:text-base md:text-lg">
               Six things Drishti does for you, from the day you start planning to the report you
@@ -558,7 +558,8 @@ const Landing: React.FC = () => {
                 <span className="text-recede">That is the whole thing.</span>
               </h2>
               <p className="mt-4 text-sm font-light text-ai-gray-400 sm:mt-6 sm:text-base md:text-lg">
-                No control room to build, no training course to sit through.
+                Set it up, watch it, close it out. No control room to build and no training
+                course to sit through.
               </p>
             </div>
 
@@ -738,7 +739,7 @@ const Landing: React.FC = () => {
 
               <div className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-ai-gray-500">
                 {[
-                  'Works with your cameras',
+                  'Set up in minutes',
                   'Nothing to install at the venue',
                   'Privacy-first by design',
                 ].map((chip) => (
@@ -770,7 +771,8 @@ const Landing: React.FC = () => {
                 <span className="text-xl font-bold tracking-tight">Drishti</span>
               </div>
               <p className="max-w-xs text-sm font-light leading-relaxed text-ai-gray-500">
-                AI that watches the crowd, so your team can look after the people in it.
+                Event safety from the first plan to the final report, so your team can look
+                after the people who came.
               </p>
             </div>
 
